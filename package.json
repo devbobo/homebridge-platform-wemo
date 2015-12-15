@@ -1,7 +1,7 @@
 {
   "name": "homebridge-platform-wemo",
   "version": "0.0.1",
-  "description": "WeMo Platform plugin for homebridge: https://github.com/nfarina/homebridge",
+  "description": "WeMo Platform plugin for homebridge",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
