@@ -18,7 +18,7 @@ Configuration sample:
  ```javascript
 "platforms": [
         {
-          "platform": "WeMo",
+          "platform": "BelkinWeMo",
           "name": "WeMo Platform",
           "expected_accessories" : "x",
           "timeout" : "y"
