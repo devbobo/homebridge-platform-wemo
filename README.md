@@ -27,7 +27,11 @@ Configuration sample:
 
 ```
 
-The module will try and find all your WeMo Devices and make them available to HoomeBridge / HomeKit / Siri.
+The module will try and find all your WeMo Devices and make them available to HomeBridge / HomeKit / Siri.
+
+# ToDo
+
+The code needs some work to increase the speed of status checking by persisting the WemoClient objects I am using (amateur!). I'll get to this shortly and release a new version that also depends on Timon Reinhard's core wemo-client project not my derived version.
 
 # Credits
 
