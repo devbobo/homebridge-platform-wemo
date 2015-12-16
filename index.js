@@ -151,7 +151,7 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 }
 WemoAccessory.prototype.setBrightness = function (value, cb) {
 	var client = wemo.client(this.device);
-	client.setDeviceStatus(this.enddevice.deviceId, 10008, value );
+	client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
 	this.log("setBrightness: %s to %s\%", this.name, value);
 	if (cb) cb(null);
 }
