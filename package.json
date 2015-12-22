@@ -1,6 +1,6 @@
 {
   "name": "homebridge-platform-wemo",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "WeMo Platform plugin for homebridge - Blubs, Switches and Insight Switches Supported",
   "license": "ISC",
   "keywords": [
@@ -19,6 +19,6 @@
 
   "dependencies": {
     "request": "^2.65.0",
-    "wemo-client": ""
+    "wemo-client": "*"
   }
 }
