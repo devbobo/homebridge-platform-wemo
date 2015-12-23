@@ -139,6 +139,15 @@ WemoAccessory.prototype.getServices = function () {
 	// todo - complete this information
 	var accessoryInformationService = new Service.AccessoryInformation();
 	accessoryInformationService.setCharacteristic(Characteristic.Name, this.name).setCharacteristic(Characteristic.Manufacturer, "WeMo");
+
+	if (this.enddevice == undefined) {
+		accessoryInformationService
+			.setCharacteristic(Characteristic.Model, this.device.modelDescription)
+			.setCharacteristic(Characteristic.SerialNumber, this.device.serialNumber)
+			.setCharacteristic(Characteristic.FirmwareRevision, this.device.firmwareVersion)
+			.setCharacteristic(Characteristic.HardwareRevision, this.device.modelNumber);
+	}
+
 	services.push(accessoryInformationService);
 	if (this.enddevice) { // we have a lightbulb
 		var lightbulbService = new Service.Lightbulb(this.name);
