@@ -37,7 +37,7 @@ WemoPlatform.prototype = {
 		var foundAccessories = [];
 		var self = this;
 		wemo.discover(function (device) {
-			self.log("Found: %s", device.friendlyName);
+			self.log("Found: %s, type %s", device.friendlyName, device.deviceType);
 			if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
 				var client = this.client(device);
 				client.getEndDevices(function (err, enddevices) {
@@ -54,7 +54,8 @@ WemoPlatform.prototype = {
 					}
 				});
 			} else if (device.deviceType === Wemo.DEVICE_TYPE.Switch 
-					|| device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+					|| device.deviceType === Wemo.DEVICE_TYPE.Insight
+					|| device.deviceType === "urn:Belkin:device:lightswitch:1") {
 				var accessory = new WemoAccessory(self.log, device, null);
 				foundAccessories.push(accessory);
 				self.log("Discovered %s accessories of %s ", foundAccessories.length, self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")			

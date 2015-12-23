@@ -4,7 +4,8 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 
 Currently supports
 - Wemo Switch
-- Wemo Insight Switch (on/off only)
+- Wemo Light Swicth (please test and report issues)
+- Wemo Insight Switch (on/off only - please test and report issues)
 - Wemo Bulb (via Wemo Link - on/off/brightness)
 
 # Installation
@@ -39,6 +40,8 @@ Configuration sample:
 ```
 
 The module will try and find all your WeMo Devices and make them available to HomeBridge / HomeKit / Siri.
+
+The discovery process can be a little hit or miss with the Wemo platform so if all your devices are not discovered try restarting homebridge a few times and make sure all Lights (Bulbs) are on!
 
 # ToDo
 
