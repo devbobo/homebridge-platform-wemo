@@ -43,7 +43,7 @@ WemoPlatform.prototype = {
 		var foundAccessories = [];
 		var self = this;
 		wemo.discover(function (device) {
-			self.log("Found: %s, type %s", device.friendlyName, device.deviceType);
+			self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
 			if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
 				var client = this.client(device);
 				client.getEndDevices(function (err, enddevices) {
@@ -52,7 +52,9 @@ WemoPlatform.prototype = {
 						self.log("Found endDevice: %s, id: %s", enddevices[i].friendlyName, enddevices[i].deviceId);
 						var accessory = new WemoAccessory(self.log, device, enddevices[i]);
 						foundAccessories.push(accessory);
-						self.log("Discovered %s accessories of %s ", foundAccessories.length, self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")			
+						self.log("Discovered %s accessories of %s ", 
+									foundAccessories.length, 
+									self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")			
 						if (foundAccessories.length == self.expectedAccessories){
 							if (timer) {clearTimeout(timer);}
 							callback(foundAccessories);
@@ -62,19 +64,26 @@ WemoPlatform.prototype = {
 			} else if (device.deviceType !== Wemo.DEVICE_TYPE.Maker) {
 				var accessory = new WemoAccessory(self.log, device, null);
 				foundAccessories.push(accessory);
-				self.log("Discovered %s accessories of %s ", foundAccessories.length, self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")			
-				if (foundAccessories.length == self.expectedAccessories){
-					if (timer) {clearTimeout(timer);}
+				self.log("Discovered %s accessories of %s ", 
+							foundAccessories.length, 
+							self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories");
+				if (foundAccessories.length == self.expectedAccessories)
+					{
+					self.log("Woohoo!!! all %s accessories found.", self.expectedAccessories );
+					if (timer) {clearTimeout(timer);} // if setTimeout got called already cancel it.
 					callback(foundAccessories);
+					}
 				}
-			}
 		});
 
-		// we'll wait here for the accessories to be found unless the specified number of accessories has already been found in which case we'll never get here!!
+		// we'll wait here for the accessories to be found unless the specified number of 
+		// accessories has already been found in which case the timeout is cancelled!!
 
 		var timer = setTimeout(function () {
-			if(self.expectedAccessories) { self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json", 
-				foundAccessories.length, self.expectedAccessories) }
+			if(self.expectedAccessories) { 
+				self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json", 
+					foundAccessories.length, self.expectedAccessories); 
+					}
 			callback(foundAccessories);
 		}, self.timeout * 1000);
 	},
@@ -112,6 +121,7 @@ function WemoAccessory(log, device, enddevice) {
 		// set onState for convenience
 		this.onState = device.binaryState > 0 ? true : false ;
 		this.log("%s is %s", this.name, this.onState);
+
 
 		// register eventhandler
 		var timer = null;
@@ -242,30 +252,6 @@ WemoAccessory.prototype.setOnStatus = function (value, cb) {
 }
 
 WemoAccessory.prototype.getOnStatus = function (cb) {
-// 	var client = wemo.client(this.device);
-/*
-	var self = this;
-	this._client.getDeviceStatus(this.enddevice.deviceId, function (err, state) {
-		if(err) {
-			if(cb) {cb("unknown error getting device status (OnStatus)")}
-			}
-		else {
-			// convert string of capabilities and values to arrays.
-			var capabilities = state.CapabilityID[0].split(',');
-			var capabilityValues = state.CapabilityValue[0].split(',');
-			// extract value if capability 10006 - onState
-			var onState = capabilityValues[capabilities.indexOf('10006')];
-			self.log("getOnStatus: %s is %s", self.name, onState);
-			if (cb) {
-				if (onState) {
-					cb(null, (onState > 0 ? true : false));
-				} else {
-					cb("Currently offline");
-				}
-			}
-		}
-	});
-*/
 	this.log("getOnStatus: %s is %s", this.name, this.onState)
 	if(cb) cb(null, this.onState);
 }
@@ -280,28 +266,4 @@ WemoAccessory.prototype.setBrightness = function (value, cb) {
 WemoAccessory.prototype.getBrightness = function (cb) {
 	this.log("getBrightness: %s is %s", this.name, this.brightness)
 	if(cb) cb(null, this.brightness);
-	
-	
-// 	var client = wemo.client(this.device);
-/*
-	var self = this;
-	this._client.getDeviceStatus(this.enddevice.deviceId, function (err, state) {
-		if(err) {
-			if(cb) {cb("unknown error getting device status (Brightness)")}
-			}
-		else {
-			var capabilities = state.CapabilityID[0].split(',');
-			var capabilityValues = state.CapabilityValue[0].split(',');
-			var brightness = Math.round(capabilityValues[capabilities.indexOf('10008')].split(':').shift() / 255 * 100);
-			self.log("getBrightness: %s brightness %s\%", self.name, brightness);
-			if (cb) {
-				if (brightness) {
-					cb(null, brightness);
-				} else {
-					cb("Currently offline")
-				}
-			}
-		}
-	});
-*/
 }
