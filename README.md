@@ -4,9 +4,10 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 
 Currently supports
 - Wemo Switch
-- Wemo Light Swicth (please test and report issues)
-- Wemo Insight Switch (on/off only - please test and report issues)
+- Wemo Light Swicth 
+- Wemo Insight Switch (on/off only)
 - Wemo Bulb (via Wemo Link - on/off/brightness)
+- Wemo Motion
 
 # Installation
 
