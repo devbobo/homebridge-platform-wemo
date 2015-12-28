@@ -184,7 +184,14 @@ WemoAccessory.prototype.getServices = function () {
 	service.setCharacteristic(Characteristic.Name, this.name).setCharacteristic(Characteristic.Manufacturer, "WeMo");
 
 	if (this.device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
-		// todo - complete this information
+		// todo - complete this information - if it was available.... which unfortunately it isn't 
+/*
+		service
+            .setCharacteristic(Characteristic.Model, this.enddevice.modelName)
+            .setCharacteristic(Characteristic.SerialNumber, this.enddevice.serialNumber)
+            .setCharacteristic(Characteristic.FirmwareRevision, this.enddevice.firmwareVersion)
+            .setCharacteristic(Characteristic.HardwareRevision, this.enddevice.modelNumber);
+*/
 	}
 	else {
 		service
@@ -232,7 +239,7 @@ WemoAccessory.prototype.getServices = function () {
 
 WemoAccessory.prototype.setOn = function (value, cb) {
 // 	var client = wemo.client(this.device);
-	this.log("setOn: % to %s", this.name, value);
+	this.log("setOn: %s to %s", this.name, value);
 	this._client.setBinaryState(value ? 1 : 0);
 	this.onState = value;
 	if (cb) cb(null);
