@@ -123,7 +123,6 @@ function WemoAccessory(log, device, enddevice) {
 		this.onState = device.binaryState > 0 ? true : false ;
 		this.log("%s is %s", this.name, this.onState);
 
-
 		// register eventhandler
 		var timer = null;
 
@@ -131,10 +130,10 @@ function WemoAccessory(log, device, enddevice) {
 			self.log('%s binaryState: %s', this.name, state);
 			self.onState = state > 0 ? true : false ;
 
-			if (self.characteristic) {
-				if (self.onState != self.oldState) {
+			if (self.service) {
+				if (self.onState != self._onState) {
 					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion || self.device.deviceType == "urn:Belkin:device:NetCamSensor:1") {
-						if (self.onState == true || self.oldState == undefined) {
+						if (self.onState == true || self._onState == undefined) {
 							if (timer != null) {
 								self.log("%s - no motion timer stopped", self.name);
 								clearTimeout(timer);
@@ -142,27 +141,41 @@ function WemoAccessory(log, device, enddevice) {
 							}
 
 							self.log("%s - notify binaryState change: %s", self.name, +self.onState);
-							self.characteristic.setValue(self.onState);
+							self.service.getCharacteristic(Characteristic.MotionDetected).setValue(self.onState);
 						}
 						else {
 							self.log("%s - no motion timer started [%d secs]", self.name, noMotionTimer);
 							clearTimeout(timer);
 							timer = setTimeout(function () {
 								self.log("%s - no motion timer completed; notify binaryState change: 0", self.name);
-								self.characteristic.setValue(false);
-								self.oldState = false;
+								self.service.getCharacteristic(Characteristic.MotionDetected).setValue(false);
+								self._onState = false;
 								timer = null;
 							}, noMotionTimer * 1000);
 						}
 					}
 					else {
-						self.characteristic.setValue(self.onState);
+						self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
 					}
 
-					self.oldState = self.onState;
+					self._onState = self.onState;
 				}
 			}
 		}.bind(this));
+
+		if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+			this._client.on('insightParams', function(state){
+				//self.log('%s inUse: %s', this.name, state);
+				self.inUse = state == 1 ? true : false ;
+
+				if (self.service) {
+					if (self.inUse != self._inUse) {
+						self.service.getCharacteristic(Characteristic.OutletInUse).setValue(self.inUse);
+						self._inUse = self.inUse;
+					}
+				}
+			}.bind(this));
+		}
 	}
 }
 
@@ -206,31 +219,36 @@ WemoAccessory.prototype.getServices = function () {
 
 	switch(this.device.deviceType) {
 		case Wemo.DEVICE_TYPE.Bridge:
-			service = new Service.Lightbulb(this.name);
+			this.service = new Service.Lightbulb(this.name);
 
-			service.getCharacteristic(Characteristic.On).on('set', this.setOnStatus.bind(this)).on('get', this.getOnStatus.bind(this));
-			service.getCharacteristic(Characteristic.Brightness).on('set', this.setBrightness.bind(this)).on('get', this.getBrightness.bind(this));
+			this.service.getCharacteristic(Characteristic.On).on('set', this.setOnStatus.bind(this)).on('get', this.getOnStatus.bind(this));
+			this.service.getCharacteristic(Characteristic.Brightness).on('set', this.setBrightness.bind(this)).on('get', this.getBrightness.bind(this));
 
-			services.push(service);
+			services.push(this.service);
 			break;
 		case Wemo.DEVICE_TYPE.Insight:
+			this.service = new Service.Switch(this.name);
+
+			this.service.getCharacteristic(Characteristic.On).on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
+			this.service.addCharacteristic(Characteristic.OutletInUse).on('set', this.setInUse.bind(this)).on('get', this.getInUse.bind(this));
+
+			services.push(this.service);
+			break;
 		case Wemo.DEVICE_TYPE.Switch:
 		case "urn:Belkin:device:lightswitch:1":
-			service = new Service.Switch(this.name);
+			this.service = new Service.Switch(this.name);
 
-			this.characteristic = service.getCharacteristic(Characteristic.On)
-			this.characteristic.on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
+			this.service.getCharacteristic(Characteristic.On).on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
 
-			services.push(service);
+			services.push(this.service);
 			break;
 		case Wemo.DEVICE_TYPE.Motion:
 		case "urn:Belkin:device:NetCamSensor:1":
-			service = new Service.MotionSensor(this.name);
+			this.service = new Service.MotionSensor(this.name);
 
-			this.characteristic = service.getCharacteristic(Characteristic.MotionDetected)
-			this.characteristic.on('get', this.getOn.bind(this));
+			this.service.getCharacteristic(Characteristic.MotionDetected).on('get', this.getOn.bind(this));
 
-			services.push(service);
+			services.push(this.service);
 			break;
 		default:
 			console.log("Not implemented");
@@ -245,12 +263,24 @@ WemoAccessory.prototype.setOn = function (value, cb) {
 	this._client.setBinaryState(value ? 1 : 0);
 	this.onState = value;
 	if (cb) cb(null);
-
 }
 
 WemoAccessory.prototype.getOn = function (cb) {
 	this.log("getOn: %s is %s ", this.name, this.onState);
 	if (cb) cb(null, this.onState);
+}
+
+WemoAccessory.prototype.setInUse = function (value, cb) {
+// 	var client = wemo.client(this.device);
+	this.log("setOn: %s to %s", this.name, value);
+	this._client.setBinaryState(value ? 1 : 0);
+	this.inUse = value;
+	if (cb) cb(null);
+}
+
+WemoAccessory.prototype.getInUse = function (cb) {
+	this.log("getOn: %s is %s ", this.name, this.inUse);
+	if (cb) cb(null, this.inUse);
 }
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
