@@ -230,7 +230,7 @@ WemoAccessory.prototype.getServices = function () {
 			this.service = new Service.Switch(this.name);
 
 			this.service.getCharacteristic(Characteristic.On).on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
-			this.service.addCharacteristic(Characteristic.OutletInUse).on('set', this.setInUse.bind(this)).on('get', this.getInUse.bind(this));
+			this.service.addCharacteristic(Characteristic.OutletInUse).on('get', this.getInUse.bind(this));
 
 			services.push(this.service);
 			break;
@@ -268,14 +268,6 @@ WemoAccessory.prototype.setOn = function (value, cb) {
 WemoAccessory.prototype.getOn = function (cb) {
 	this.log("getOn: %s is %s ", this.name, this.onState);
 	if (cb) cb(null, this.onState);
-}
-
-WemoAccessory.prototype.setInUse = function (value, cb) {
-// 	var client = wemo.client(this.device);
-	this.log("setOn: %s to %s", this.name, value);
-	this._client.setBinaryState(value ? 1 : 0);
-	this.inUse = value;
-	if (cb) cb(null);
 }
 
 WemoAccessory.prototype.getInUse = function (cb) {
