@@ -92,12 +92,12 @@ WemoPlatform.prototype = {
 function WemoAccessory(log, device, enddevice) {
 	var self = this;
 
-	this.id = device.deviceId;
 	this.device = device;
 	this.log = log;
 	this._client = wemo.client(device);	
 
 	if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
+		this.id = device.deviceId;
 		this.name = enddevice.friendlyName;
 		this.enddevice = enddevice;
 		this.brightness = null;
@@ -116,6 +116,7 @@ function WemoAccessory(log, device, enddevice) {
 			self._statusChange(deviceId, capabilityId, value);
 		});
 	} else {
+		this.id = device.macAddress;
 		this.name = device.friendlyName;
 
 		// set onState for convenience
