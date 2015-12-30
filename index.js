@@ -133,7 +133,7 @@ function WemoAccessory(log, device, enddevice) {
 
 			if (self.characteristic) {
 				if (self.onState != self.oldState) {
-					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion) {
+					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion || self.device.deviceType == "urn:Belkin:device:NetCamSensor:1") {
 						if (self.onState == true || self.oldState == undefined) {
 							if (timer != null) {
 								self.log("%s - no motion timer stopped", self.name);
@@ -224,6 +224,7 @@ WemoAccessory.prototype.getServices = function () {
 			services.push(service);
 			break;
 		case Wemo.DEVICE_TYPE.Motion:
+		case "urn:Belkin:device:NetCamSensor:1":
 			service = new Service.MotionSensor(this.name);
 
 			this.characteristic = service.getCharacteristic(Characteristic.MotionDetected)
