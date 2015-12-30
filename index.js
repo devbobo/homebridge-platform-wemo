@@ -92,12 +92,12 @@ WemoPlatform.prototype = {
 function WemoAccessory(log, device, enddevice) {
 	var self = this;
 
-	this.id = device.deviceId;
 	this.device = device;
 	this.log = log;
 	this._client = wemo.client(device);	
 
 	if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
+		this.id = device.deviceId;
 		this.name = enddevice.friendlyName;
 		this.enddevice = enddevice;
 		this.brightness = null;
@@ -116,6 +116,7 @@ function WemoAccessory(log, device, enddevice) {
 			self._statusChange(deviceId, capabilityId, value);
 		});
 	} else {
+		this.id = device.macAddress;
 		this.name = device.friendlyName;
 
 		// set onState for convenience
@@ -132,7 +133,7 @@ function WemoAccessory(log, device, enddevice) {
 
 			if (self.characteristic) {
 				if (self.onState != self.oldState) {
-					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion) {
+					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion || self.device.deviceType == "urn:Belkin:device:NetCamSensor:1") {
 						if (self.onState == true || self.oldState == undefined) {
 							if (timer != null) {
 								self.log("%s - no motion timer stopped", self.name);
@@ -223,6 +224,7 @@ WemoAccessory.prototype.getServices = function () {
 			services.push(service);
 			break;
 		case Wemo.DEVICE_TYPE.Motion:
+		case "urn:Belkin:device:NetCamSensor:1":
 			service = new Service.MotionSensor(this.name);
 
 			this.characteristic = service.getCharacteristic(Characteristic.MotionDetected)
