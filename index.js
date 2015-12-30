@@ -271,7 +271,7 @@ WemoAccessory.prototype.getOn = function (cb) {
 }
 
 WemoAccessory.prototype.getInUse = function (cb) {
-	this.log("getOn: %s is %s ", this.name, this.inUse);
+	this.log("getInUse: %s is %s ", this.name, this.inUse);
 	if (cb) cb(null, this.inUse);
 }
 
