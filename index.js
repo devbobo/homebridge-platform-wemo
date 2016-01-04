@@ -11,6 +11,7 @@
 //			"no_motion_timer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
 //		}
 // ],
+
 "use strict";
 
 var Accessory, Characteristic, PowerConsumption, Service, uuid;
