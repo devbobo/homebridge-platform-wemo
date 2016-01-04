@@ -103,18 +103,14 @@ function WemoAccessory(log, device, enddevice) {
 		this.brightness = null;
 		this._capabilities = enddevice.capabilities;
 
-		// set onState for convenience from capabilities 
-		// this does not however appear to be very reliable but thats an Belkin issue
-		this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false ;
-		this.log("%s is %s", this.name, this.onState);
-
-		var self = this;
-		
-		// set brightness for convenience.
-		// this does not however appear to be very reliable but thats an Belkin issue
-		this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
-		this.log("%s is %s bright", this.name, this.brightness);
-
+		// we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
+		this.getStatus(function (err) {
+			self.onState = (self._capabilities['10006'].substr(0,1) === '1') ? true : false ;
+			self.log("%s is %s", self.name, self.onState);
+			self.brightness = Math.round(self._capabilities['10008'].split(':').shift() / 255 * 100 );
+			self.log("%s is %s bright", self.name, self.brightness);
+			});
+			
 		// register eventhandler
 		this._client.on('statusChange', function(deviceId, capabilityId, value) {
 			self._statusChange(deviceId, capabilityId, value);
@@ -280,6 +276,23 @@ WemoAccessory.prototype.getOn = function (cb) {
 WemoAccessory.prototype.getInUse = function (cb) {
 	this.log("getInUse: %s is %s ", this.name, this.inUse);
 	if (cb) cb(null, this.inUse);
+}
+
+WemoAccessory.prototype.getStatus = function (cb) {
+	// this function is called on initialisation of a Bulbas we can't rely on Belkin's
+	// capabilities structure on initialisation
+	var self = this;
+	this._client.getDeviceStatus(this.enddevice.deviceId, function (err, capabilities) {
+		if(err) {
+			if(cb) {cb("unknown error getting device status (getStatus)", capabilities)}
+			}
+		else {
+			// convert string of capabilities and values to arrays.
+			self._capabilities = capabilities;
+			self.log("getStatus: %s is ", self.name, capabilities);
+			if (cb) { cb(null) }
+			}
+		});
 }
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
