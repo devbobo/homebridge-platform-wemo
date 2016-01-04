@@ -13,7 +13,7 @@
 // ],
 "use strict";
 
-var Service, Characteristic, Accessory, uuid;
+var Accessory, Characteristic, PowerConsumption, Service, uuid;
 var Wemo = require('wemo-client');
 var wemo = new Wemo();
 
@@ -24,6 +24,20 @@ module.exports = function (homebridge) {
 	Characteristic = homebridge.hap.Characteristic;
 	Accessory = homebridge.hap.Accessory;
 	uuid = homebridge.hap.uuid;
+
+	PowerConsumption = function() {
+		Characteristic.call(this, 'Power Consumption', 'AE48F447-E065-4B31-8050-8FB06DB9E087')
+
+		this.setProps({
+			format: Characteristic.Formats.FLOAT,
+			unit: 'W',
+			perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
+		});
+
+		this.value = this.getDefaultValue();
+	};
+	require('util').inherits(PowerConsumption, Characteristic);
+
 	homebridge.registerPlatform("homebridge-platform-wemo", "BelkinWeMo", WemoPlatform);
 };
 
@@ -94,7 +108,7 @@ function WemoAccessory(log, device, enddevice) {
 
 	this.device = device;
 	this.log = log;
-	this._client = wemo.client(device);	
+	this._client = wemo.client(device);
 
 	if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
 		this.id = device.deviceId;
@@ -110,7 +124,7 @@ function WemoAccessory(log, device, enddevice) {
 			self.brightness = Math.round(self._capabilities['10008'].split(':').shift() / 255 * 100 );
 			self.log("%s is %s bright", self.name, self.brightness);
 			});
-			
+
 		// register eventhandler
 		this._client.on('statusChange', function(deviceId, capabilityId, value) {
 			self._statusChange(deviceId, capabilityId, value);
@@ -133,29 +147,18 @@ function WemoAccessory(log, device, enddevice) {
 			if (self.service) {
 				if (self.onState != self._onState) {
 					if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion || self.device.deviceType == "urn:Belkin:device:NetCamSensor:1") {
-						if (self.onState == true || self._onState == undefined) {
-							if (timer != null) {
-								self.log("%s - no motion timer stopped", self.name);
-								clearTimeout(timer);
-								timer = null;
-							}
-
-							self.log("%s - notify binaryState change: %s", self.name, +self.onState);
-							self.service.getCharacteristic(Characteristic.MotionDetected).setValue(self.onState);
-						}
-						else {
-							self.log("%s - no motion timer started [%d secs]", self.name, noMotionTimer);
-							clearTimeout(timer);
-							timer = setTimeout(function () {
-								self.log("%s - no motion timer completed; notify binaryState change: 0", self.name);
-								self.service.getCharacteristic(Characteristic.MotionDetected).setValue(false);
-								self._onState = false;
-								timer = null;
-							}, noMotionTimer * 1000);
-						}
+						self.updateMotionDetected();
 					}
 					else {
 						self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
+
+						if(self.onState == false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+							self.inUse = false;
+							self.updateInUse();
+
+							self.powerUsage = 0;
+							self.updatePowerUsage();
+						}
 					}
 
 					self._onState = self.onState;
@@ -164,15 +167,15 @@ function WemoAccessory(log, device, enddevice) {
 		}.bind(this));
 
 		if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
-			this._client.on('insightParams', function(state){
+			this._client.on('insightParams', function(state, power){
 				//self.log('%s inUse: %s', this.name, state);
 				self.inUse = state == 1 ? true : false ;
+				self.powerUsage = Math.round(power / 100) / 10;
 
 				if (self.service) {
-					if (self.inUse != self._inUse) {
-						self.service.getCharacteristic(Characteristic.OutletInUse).setValue(self.inUse);
-						self._inUse = self.inUse;
-					}
+					self.updateInUse();
+					self.updatePowerUsage();
+
 				}
 			}.bind(this));
 		}
@@ -232,6 +235,7 @@ WemoAccessory.prototype.getServices = function () {
 
 			this.service.getCharacteristic(Characteristic.On).on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
 			this.service.addCharacteristic(Characteristic.OutletInUse).on('get', this.getInUse.bind(this));
+			this.service.addCharacteristic(PowerConsumption).on('get', this.getPowerUsage.bind(this));
 
 			services.push(this.service);
 			break;
@@ -274,8 +278,13 @@ WemoAccessory.prototype.getOn = function (cb) {
 }
 
 WemoAccessory.prototype.getInUse = function (cb) {
-	this.log("getInUse: %s is %s ", this.name, this.inUse);
+	//this.log("getInUse: %s is %s ", this.name, this.inUse);
 	if (cb) cb(null, this.inUse);
+}
+
+WemoAccessory.prototype.getPowerUsage = function (cb) {
+	//this.log("getPowerUsage: %s is %s ", this.name, this.powerUsage);
+	if (cb) cb(null, this.powerUsage);
 }
 
 WemoAccessory.prototype.getStatus = function (cb) {
@@ -318,3 +327,43 @@ WemoAccessory.prototype.getBrightness = function (cb) {
 	this.log("getBrightness: %s is %s", this.name, this.brightness)
 	if(cb) cb(null, this.brightness);
 }
+
+WemoAccessory.prototype.updateInUse = function () {
+	if (this.inUse != this._inUse) {
+		this.service.getCharacteristic(Characteristic.OutletInUse).setValue(this.inUse);
+		this._inUse = this.inUse;
+	}
+}
+
+WemoAccessory.prototype.updateMotionDetected = function() {
+	var self = this;
+
+	if (this.onState == true || this._onState == undefined) {
+		if (this.motionTimer) {
+			this.log("%s - no motion timer stopped", this.name);
+			clearTimeout(this.motionTimer);
+			this.motionTimer = null;
+		}
+
+		this.log("%s - notify binaryState change: %s", this.name, +this.onState);
+		this.service.getCharacteristic(Characteristic.MotionDetected).setValue(this.onState);
+	}
+	else {
+		this.log("%s - no motion timer started [%d secs]", self.name, noMotionTimer);
+		clearTimeout(this.motionTimer);
+		this.motionTimer = setTimeout(function () {
+			self.log("%s - no motion timer completed; notify binaryState change: 0", self.name);
+			self.service.getCharacteristic(Characteristic.MotionDetected).setValue(false);
+			self._onState = false;
+			self.motionTimer = null;
+		}, noMotionTimer * 1000);
+	}
+}
+
+WemoAccessory.prototype.updatePowerUsage = function () {
+	if (this.powerUsage != this._powerUsage) {
+		this.service.getCharacteristic(PowerConsumption).setValue(this.powerUsage);
+		this._powerUsage = this.powerUsage;
+	}
+}
+
