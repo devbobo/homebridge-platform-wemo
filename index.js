@@ -101,14 +101,18 @@ function WemoAccessory(log, device, enddevice) {
 		this.name = enddevice.friendlyName;
 		this.enddevice = enddevice;
 		this.brightness = null;
-		this._internalState = enddevice.internalState;
+		this._capabilities = enddevice.capabilities;
 
-		// set onState for convenience
-		this.onState = (this._internalState['10006'].substr(0,1) === '1') ? true : false ;
-		this.log("%s is %s", this.name, this.onState, this._internalState['10006'].substr(0,1));
+		// set onState for convenience from capabilities 
+		// this does not however appear to be very reliable but thats an Belkin issue
+		this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false ;
+		this.log("%s is %s", this.name, this.onState);
 
+		var self = this;
+		
 		// set brightness for convenience.
-		this.brightness = Math.round(this._internalState['10008'].split(':').shift() / 255 * 100 );
+		// this does not however appear to be very reliable but thats an Belkin issue
+		this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
 		this.log("%s is %s bright", this.name, this.brightness);
 
 		// register eventhandler
@@ -181,14 +185,15 @@ function WemoAccessory(log, device, enddevice) {
 
 WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) {
 	this.log('statusChange: %s', deviceId, capabilityId, value);
-	this._internalState[capabilityId] = value;
+	this._capabilities[capabilityId] = value;
 
 	if (capabilityId ==='10008') {
-		this.brightness = Math.round(this._internalState['10008'].split(':').shift() / 255 * 100 );
-		this._internalState['10006'] = '1';	 //changing wemo bulb brightness always turns them on so lets reflect this!
+		this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
+// 		this.setOnStatus('1');
+		this._capabilities['10006'] = '1';	 //changing wemo bulb brightness always turns them on so lets reflect this!
 	}
 
-	this.onState = (this._internalState['10006'].substr(0,1) === '1') ? true : false;
+	this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
 }
 
 WemoAccessory.prototype.getServices = function () {
@@ -259,9 +264,11 @@ WemoAccessory.prototype.getServices = function () {
 
 WemoAccessory.prototype.setOn = function (value, cb) {
 // 	var client = wemo.client(this.device);
-	this.log("setOn: %s to %s", this.name, value);
-	this._client.setBinaryState(value ? 1 : 0);
-	this.onState = value;
+	if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
+		this.log("setOn: %s to %s", this.name, value);
+		this._client.setBinaryState(value ? 1 : 0);
+		this.onState = value;
+		}
 	if (cb) cb(null);
 }
 

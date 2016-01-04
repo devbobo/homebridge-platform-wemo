@@ -5,9 +5,10 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 Currently supports
 - Wemo Switch
 - Wemo Light Swicth 
-- Wemo Insight Switch (on/off only)
+- Wemo Insight Switch (on/off/outlineinuse only)
 - Wemo Bulb (via Wemo Link - on/off/brightness)
 - Wemo Motion
+- Wemo NetCam (Sensor)
 
 # Installation
 
@@ -25,16 +26,21 @@ Recently refactored to increase speed of operation and update on/off/brightness 
 
 Configuration sample:
 
-`expected_accessories` is the count of Wemo bulbs and switches you have - it is optional and if not specified the `timeout` value will be used to wait for the discovery process to conclude. 
-`timeout` is specified in seconds and will default to 10 seconds.
+`expected_accessories` is **optional**, defaults to unlimited and is the total count of Wemo bulbs, switches, etc that we will try to find. It essentially shrtcuts the `timeout` value - i.e. if we find the specified number of accessories we'l not bother with the timeout.
+
+`timeout` is **optional**, defaults to 10 and if specified, in seconds, defines how long we will wait to find the specified number of `expected_accessories`
+
+`no_motion_timer` is optional, defaults to 60 and applies to WeMo Motion Only. It is a timer in seconds for how long after motion is not detected that the state is changed.
+
 
  ```javascript
 "platforms": [
         {
           "platform": "BelkinWeMo",
           "name": "WeMo Platform",
-          "expected_accessories" : "x",
-          "timeout" : "y"
+          "expected_accessories" : "0",
+          "timeout" : "25",
+          "no_motion_timer": "60"
         }   
     ]
 
@@ -53,6 +59,7 @@ The code was recently updated to increase the speed of status checking by persis
 Credit goes to
 - Timon Reinhard for his awesome [Wemo Client](https://github.com/timonreinhard/wemo-client) module and advise 
 - Andy Lindeman for the [homebridge-smartthings](https://github.com/alindeman/homebridge-smartthings) that this is work is based on.
+- [David Perry](https://github.com/devbobo) for his contributions.
 
 # License
 
