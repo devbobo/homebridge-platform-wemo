@@ -287,9 +287,13 @@ WemoAccessory.prototype.getStatus = function (cb) {
 			if(cb) {cb("unknown error getting device status (getStatus)", capabilities)}
 			}
 		else {
-			// convert string of capabilities and values to arrays.
-			self._capabilities = capabilities;
-			self.log("getStatus: %s is ", self.name, capabilities);
+			if (!capabilities['10006'].length) { // we've get no data in the capabilities array, so it's off
+				self.log("%s appears to be off, i.e. at the power!",self.name);
+				}
+			else {
+				self.log("getStatus: %s is ", self.name, capabilities);
+				self._capabilities = capabilities;
+				}
 			if (cb) { cb(null) }
 			}
 		});
