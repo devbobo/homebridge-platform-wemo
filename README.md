@@ -59,7 +59,7 @@ The code was recently updated to increase the speed of status checking by persis
 Credit goes to
 - Timon Reinhard for his awesome [Wemo Client](https://github.com/timonreinhard/wemo-client) module and advise 
 - Andy Lindeman for the [homebridge-smartthings](https://github.com/alindeman/homebridge-smartthings) that this is work is based on.
-- [David Perry](https://github.com/devbobo) for his contributions.
+- [David Parry](https://github.com/devbobo) for his contributions.
 
 # License
 
