@@ -185,15 +185,28 @@ function WemoAccessory(log, device, enddevice) {
 
 WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) {
 	this.log('statusChange: %s', deviceId, capabilityId, value);
-	this._capabilities[capabilityId] = value;
+	
+	// if nothing has changed then lets bug out so we don't do unncessary work and/or cause a nasty loop.
+	if (this._capabilities[capabilityId] === value) {
+		this.log('no need to update capability:', deviceId, capabilityId, value)
+		return;
+		}
+		
+	this._capabilities[capabilityId] = value;	
 
+	// todo - align homekit with this change without causing an endless loop....
 	if (capabilityId ==='10008') {
 		this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
-// 		this.setOnStatus('1');
-		this._capabilities['10006'] = '1';	 //changing wemo bulb brightness always turns them on so lets reflect this!
+		// changing wemo bulb brightness always turns them on so lets reflect this!
+		// and update Homekit with this change if need be
+		if (!this.onState){
+			this._capabilities['10006'] = '1';
+			this.service.getCharacteristic(Characteristic.On).setValue(true)
+			}
 	}
 
 	this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
+
 }
 
 WemoAccessory.prototype.getServices = function () {
