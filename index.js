@@ -142,7 +142,7 @@ function WemoAccessory(log, device, enddevice) {
         var timer = null;
 
         this._client.on('binaryState', function(state){
-            self.log('%s binaryState: %s', this.name, state);
+            self.log('%s binaryState: %s', this.name, state > 0 ? "on" : "off");
             self.onState = state > 0 ? true : false ;
 
             if (self.service) {
@@ -184,29 +184,51 @@ function WemoAccessory(log, device, enddevice) {
 }
 
 WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) {
-    this.log('statusChange: %s', deviceId, capabilityId, value);
-
-    // if nothing has changed then lets bug out so we don't do unncessary work and/or cause a nasty loop.
+    /*
+    // We recieve this notification if the wemo's are changed by Homekit (i.e us)or some other trigger (i.e. Pethora of wemo apps)
+    // and we want to update homekit with these changes - we need to use setValue to achive this which triggers another call here which
+    // we'll ignore, so if nothing has changed then lets bug out so we don't do unncessary work and/or cause a nasty loop.
+    */
     if (this._capabilities[capabilityId] === value) {
-        this.log('no need to update capability:', deviceId, capabilityId, value)
+        this.log('statusChange Ignored: ', deviceId, capabilityId, value)
         return;
         }
 
+    this.log('statusChange processing: ', deviceId, capabilityId, value);
+
+    // update our internal array with newly passed value.
     this._capabilities[capabilityId] = value;
+    
+    switch(capabilityId) {
+        case '10008': // this is a brightness change
+            // update our convenience variable
+            this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
+            
+            // call setValue to update HomeKit and iOS (this generates another statusChange that will get ignored)
+            this.log('Update homekit brightness: %s is %s', this.name, this.brightness);
+            this.service.getCharacteristic(Characteristic.Brightness).setValue(this.brightness);
 
-    // todo - align homekit with this change without causing an endless loop....
-    if (capabilityId ==='10008') {
-        this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
-        // changing wemo bulb brightness always turns them on so lets reflect this!
-        // and update Homekit with this change if need be
-        if (!this.onState){
-            this._capabilities['10006'] = '1';
-            this.service.getCharacteristic(Characteristic.On).setValue(true)
-            }
+            // changing wemo bulb brightness always turns them on so lets reflect this locally and in homekit.
+            // do we really need this or do we get both status change messages from wemo?
+            if (!this.onState){ // if off
+                this.onState = true; // change convenience variable to on and call homekit which will trigger another ignored statusChange
+                this._capabilities['10006'] = '1';
+                this.log('Update homekit onState: %s is %s', this.name, this.onState);
+                this.service.getCharacteristic(Characteristic.On).setValue(this.onState);
+                }
+            break;
+            
+        case '10006': // on/off/etc
+            // reflect change of onState from potentially and external change (from Wemo App for instance)
+            this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
+            // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore    
+            this.log('Update homekit onState: %s is %s', this.name, this.onState);
+            this.service.getCharacteristic(Characteristic.On).setValue(this.onState);
+            break;
+            
+        default:
+            console.log("This capability (%s) not implemented", capabilityId);
     }
-
-    this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
-
 }
 
 WemoAccessory.prototype.getServices = function () {
@@ -342,7 +364,7 @@ WemoAccessory.prototype.setBrightness = function (value, cb) {
 }
 
 WemoAccessory.prototype.getBrightness = function (cb) {
-    this.log("getBrightness: %s is %s", this.name, this.brightness)
+    this.log("getBrightness: %s is %s\%", this.name, this.brightness)
     if(cb) cb(null, this.brightness);
 }
 
