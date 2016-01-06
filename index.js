@@ -85,7 +85,7 @@ WemoPlatform.prototype = {
 
                             foundDeviceIds.push(enddevices[i].deviceId);
 
-                            var accessory = new WemoAccessory(self.log, device, enddevices[i]);
+                            var accessory = new WemoAccessory(self.log, device, enddevices[i], discovered);
                             foundAccessories.push(accessory);
                         }
 
@@ -150,8 +150,6 @@ WemoPlatform.prototype = {
             Storage.forEach(function(key, device) {
                 if (device.macAddress !== undefined && foundDevices.indexOf(key) == -1) {
                     console.log("Not found: %s", device.friendlyName);
-                    //var accessory = new WemoAccessory(self.log, value, null, false);
-                    //foundAccessories.push(accessory);
                     addDevice(device, false);
                 }
             });
