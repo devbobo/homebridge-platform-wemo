@@ -49,6 +49,8 @@ function WemoPlatform(log, config) {
     this.log("Wemo Platform Plugin Loaded ");
     this.expectedAccessories = config.expected_accessories || 0 ; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
+    
+    this.devices = {};
 
     noMotionTimer = config.no_motion_timer || 60;
 }
@@ -59,12 +61,13 @@ WemoPlatform.prototype = {
         var foundAccessories = [];
         var foundDevices = [];
         var self = this;
+        var canAddAccessory = true;
 
         var addDevice = function(device, discovered) {
             if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
                 if (discovered === true) {
                     var foundDeviceIds = [];
-                    var client = self.client(device);
+                    var client = wemo.client(device);
 
                     client.getEndDevices(function (err, enddevices) {
                         // this calls us back with an array of enddevices (bulbs)
@@ -84,9 +87,19 @@ WemoPlatform.prototype = {
                             );
 
                             foundDeviceIds.push(enddevices[i].deviceId);
+                            
+                            var accessory ;
 
-                            var accessory = new WemoAccessory(self.log, device, enddevices[i], discovered);
-                            foundAccessories.push(accessory);
+                            if (self.devices[enddevices[i].deviceId] !== undefined) {
+                                accessory = self.devices[enddevices[i].deviceId];
+                                self.log("Online: %s", accessory.name);
+                                accessory.initialize(device);
+                            }
+                            else if (canAddAccessory === true) {
+                                accessory = new WemoAccessory(self.log, device, enddevices[i], discovered);
+                                foundAccessories.push(accessory);
+                                self.devices[device.enddevices[i].deviceId] = accessory;
+                            }
                         }
 
                         var persistDevice = Storage.getItemSync(device.macAddress);
@@ -103,17 +116,31 @@ WemoPlatform.prototype = {
                         var enddevice = Storage.getItemSync(device.enddevices[i]);
                         var accessory = new WemoAccessory(self.log, device, enddevice, discovered);
                         foundAccessories.push(accessory);
+                        self.devices[device.enddevices[i].deviceId] = accessory;
                     }
                 }
             }
             else if (device.deviceType !== Wemo.DEVICE_TYPE.Maker) {
-                var accessory = new WemoAccessory(self.log, device, null, discovered);
-                foundAccessories.push(accessory);
+                var accessory;
+                console.log("got device ? ");
+                console.log(self.devices[device.macAddress]);
+                if (self.devices[device.macAddress] !== undefined) {
+                    accessory = self.devices[device.macAddress];
+                    self.log("Online: %s", accessory.name);
+                    accessory.initialize(device);
+                }
+                else if (canAddAccessory === true) {
+                    accessory = new WemoAccessory(self.log, device, null, discovered);
+                    foundAccessories.push(accessory);
+                    self.devices[device.macAddress] = accessory;
+                }
             }
         };
 
         var addDiscoveredDevice = function(device) {
-            self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
+            if (self.devices[device.macAddress] === undefined) {
+                self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
+            }
 
             var persistDevice = {
                 deviceType: device.deviceType,
@@ -142,6 +169,8 @@ WemoPlatform.prototype = {
         }
 
         wemo.discover(addDiscoveredDevice);
+        wemo.discover(addDiscoveredDevice);
+        wemo.discover(addDiscoveredDevice);
 
         // we'll wait here for the accessories to be found unless the specified number of 
         // accessories has already been found in which case the timeout is cancelled!!
@@ -154,8 +183,16 @@ WemoPlatform.prototype = {
                 }
             });
 
+            canAddAccessory = false;
             callback(foundAccessories);
         }, self.timeout * 1000);
+        
+        setInterval(
+            function(){
+                wemo.discover(addDiscoveredDevice);
+            }, 
+            60000
+        );
     },
 };
 
@@ -184,17 +221,23 @@ function WemoAccessory(log, device, enddevice, discovered) {
         this.name = device.friendlyName;
     }
 
-    if (discovered === false) {
-        wemo.load(device.setupURL, function(device) {
-            console.log("GOT DEVICE");
-            self._client = wemo.client(device);
-            self._setupListeners();
-        });
+    if (discovered !== false) {
+    //    wemo.load(device.setupURL, function(device) {
+    //        console.log("GOT DEVICE");
+    //        self._client = wemo.client(device);
+    //        self._setupListeners();
+    //    });
+    //}
+    //else {
+    //    this._client = wemo.client(device);
+    //    this._setupListeners();
+        this.initialize(device);
     }
-    else {
-        this._client = wemo.client(device);
-        this._setupListeners();
-    }
+}
+
+WemoAccessory.prototype.initialize = function(device) {
+    this._client = wemo.client(device);
+    this._setupListeners();
 }
 
 WemoAccessory.prototype._setupListeners = function() {
@@ -392,12 +435,11 @@ WemoAccessory.prototype.getServices = function () {
 };
 
 WemoAccessory.prototype.setOn = function (value, cb) {
-
-    if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
+    if (this._client && this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
         this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
         this._client.setBinaryState(value ? 1 : 0);
         this.onState = value;
-        }
+    }
     if (cb) cb(null);
 }
 
@@ -439,9 +481,11 @@ WemoAccessory.prototype.getStatus = function (cb) {
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
 //  var client = wemo.client(this.device);
-    this.onState = value;
-    this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
-    this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
+    if (this._client && this.onState != value) {
+        this.onState = value;
+        this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
+        this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
+    }
     if (cb) cb(null);
 }
 
@@ -452,8 +496,10 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 
 WemoAccessory.prototype.setBrightness = function (value, cb) {
 //  var client = wemo.client(this.device);
-    this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
-    this.log("setBrightness: %s to %s\%", this.name, value);
+    if (this._client) {
+        this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
+        this.log("setBrightness: %s to %s\%", this.name, value);
+    }
     if (cb) cb(null);
 }
 
