@@ -9,6 +9,7 @@
 //          "expected_accessories": "", stop looking for wemo accessories after this many found (excluding Wemo Link(s))
 //          "timeout": "" //defaults to 10 seconds that we look for accessories.
 //          "no_motion_timer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
+//          "homekit_safe" : "1" // optional: determines if we protect your homekit config if we can't find the expected number of accessories.
 //      }
 // ],
 
@@ -17,6 +18,7 @@
 var Accessory, Characteristic, PowerConsumption, Service, uuid;
 var Wemo = require('wemo-client');
 var wemo = new Wemo();
+var debug = require('debug')('homebridge-platform-wemo');
 
 var noMotionTimer;
 
@@ -27,7 +29,7 @@ module.exports = function (homebridge) {
     uuid = homebridge.hap.uuid;
 
     PowerConsumption = function() {
-        Characteristic.call(this, 'Power Consumption', 'AE48F447-E065-4B31-8050-8FB06DB9E087')
+        Characteristic.call(this, 'Power Consumption', 'AE48F447-E065-4B31-8050-8FB06DB9E087');
 
         this.setProps({
             format: Characteristic.Formats.FLOAT,
@@ -54,10 +56,10 @@ function WemoPlatform(log, config) {
                         else  // if not defined then we we'll default to safemode true
                         {
                             this.homekitSafe = true;
-                        };
+                        }
                         
     // if we have been not been told how many accessories to find then homekit safe is off.
-    if(!this.expectedAccessories) {this.homekitSafe = false };
+    if(!this.expectedAccessories) { this.homekitSafe = false; }
 
     noMotionTimer = config.no_motion_timer || 60;
 }
@@ -111,7 +113,7 @@ WemoPlatform.prototype = {
                     foundAccessories.length, self.expectedAccessories);
                 if(self.homekitSafe) {
                     self.log("and you have indicited you'd like to keep your HomeKit config safe so we're crashing out");
-                    throw Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
+                    throw new Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
                 }
             }
             callback(foundAccessories);
@@ -136,9 +138,9 @@ function WemoAccessory(log, device, enddevice) {
         // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
         this.getStatus(function (err) {
             self.onState = (self._capabilities['10006'].substr(0,1) === '1') ? true : false ;
-            self.log("%s (bulb) reported as %s", self.name, self.onState > 0 ? "on" : "off");
+            self.log("%s (bulb) reported as %s", self.name, self.onState ? "on" : "off");
             self.brightness = Math.round(self._capabilities['10008'].split(':').shift() / 255 * 100 );
-            self.log("%s (bulb) reported as at %s\% brightness", self.name, self.brightness);
+            self.log("%s (bulb) reported as at %s%% brightness", self.name, self.brightness);
             });
 
         // register eventhandler
@@ -168,7 +170,7 @@ function WemoAccessory(log, device, enddevice) {
                     else {
                         self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
 
-                        if(self.onState == false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+                        if(self.onState === false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
                             self.inUse = false;
                             self.updateInUse();
 
@@ -373,12 +375,15 @@ WemoAccessory.prototype.getStatus = function (cb) {
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
 //  var client = wemo.client(this.device);
-    this.log(this.onState, value);
-    if(this.onState === value) {return} // we have nothing to do so lets leave it at that.
-    this.onState = value;
-    this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
-    this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
+    debug("this.Onstate currently %s, value is %s", this.onState, value );
+    if(this.onState != value) { // if we have nothing to do so lets leave it at that.
+        this.onState = value;
+        debug("this.Onstate now: %s", this.onState);
+        this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
+        this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
+    }
     if (cb) cb(null);
+    
 }
 
 WemoAccessory.prototype.getOnStatus = function (cb) {
@@ -388,15 +393,16 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 
 WemoAccessory.prototype.setBrightness = function (value, cb) {
 //  var client = wemo.client(this.device);
-    if(this.brightness === value) {return} // we have nothing to do so lets leave it at that.
-    this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
-    this.log("setBrightness: %s to %s\%", this.name, value);
-    this.brightness = value;
+    if(this.brightness != value) { // we have nothing to do so lets leave it at that.
+        this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
+        this.log("setBrightness: %s to %s%%", this.name, value);
+        this.brightness = value;
+        }
     if (cb) cb(null);
 }
 
 WemoAccessory.prototype.getBrightness = function (cb) {
-    this.log("getBrightness: %s is %s\%", this.name, this.brightness)
+    this.log("getBrightness: %s is %s%%", this.name, this.brightness)
     if(cb) cb(null, this.brightness);
 }
 
@@ -410,7 +416,7 @@ WemoAccessory.prototype.updateInUse = function () {
 WemoAccessory.prototype.updateMotionDetected = function() {
     var self = this;
 
-    if (this.onState == true || this._onState == undefined) {
+    if (this.onState === true || this._onState === undefined) {
         if (this.motionTimer) {
             this.log("%s - no motion timer stopped", this.name);
             clearTimeout(this.motionTimer);
