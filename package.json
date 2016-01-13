@@ -19,7 +19,7 @@
 
   "dependencies": {
     "request": "^2.65.0",
-    "wemo-client": "^0.6.2",
+    "wemo-client": "https://github.com/rudders/wemo-client",
     "debug" : "*"
   }
 }
