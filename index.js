@@ -9,6 +9,7 @@
 //          "expected_accessories": "", stop looking for wemo accessories after this many found (excluding Wemo Link(s))
 //          "timeout": "" //defaults to 10 seconds that we look for accessories.
 //          "no_motion_timer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
+//          "homekit_safe" : "1" // optional: determines if we protect your homekit config if we can't find the expected number of accessories.
 //      }
 // ],
 
@@ -19,6 +20,7 @@ var Wemo = require('wemo-client');
 var Storage = require('node-persist');
 
 var wemo = new Wemo();
+var debug = require('debug')('homebridge-platform-wemo');
 
 var noMotionTimer;
 
@@ -29,7 +31,7 @@ module.exports = function (homebridge) {
     uuid = homebridge.hap.uuid;
 
     PowerConsumption = function() {
-        Characteristic.call(this, 'Power Consumption', 'AE48F447-E065-4B31-8050-8FB06DB9E087')
+        Characteristic.call(this, 'Power Consumption', 'AE48F447-E065-4B31-8050-8FB06DB9E087');
 
         this.setProps({
             format: Characteristic.Formats.FLOAT,
@@ -51,6 +53,18 @@ function WemoPlatform(log, config) {
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
     
     this.devices = {};
+
+    if(config.homekit_safe) // if homekit_safe parameter defined then use it
+                        { 
+                            this.homekitSafe = config.homekit_safe > 0 ? true : false ;
+                        }
+                        else  // if not defined then we we'll default to safemode true
+                        {
+                            this.homekitSafe = true;
+                        }
+                        
+    // if we have been not been told how many accessories to find then homekit safe is off.
+    if(!this.expectedAccessories) { this.homekitSafe = false; }
 
     noMotionTimer = config.no_motion_timer || 60;
 }
@@ -184,6 +198,16 @@ WemoPlatform.prototype = {
             });
 
             canAddAccessory = false;
+
+            if(self.expectedAccessories) {
+                self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json",
+                    foundAccessories.length, self.expectedAccessories);
+                if(self.homekitSafe) {
+                    self.log("and you have indicited you'd like to keep your HomeKit config safe so we're crashing out");
+                    throw new Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
+                }
+            }
+
             callback(foundAccessories);
         }, self.timeout * 1000);
         
@@ -247,9 +271,9 @@ WemoAccessory.prototype._setupListeners = function() {
         // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
         this.getStatus(function (err) {
             self.onState = (self._capabilities['10006'].substr(0,1) === '1') ? true : false ;
-            self.log("%s (bulb) reported as %s", self.name, self.onState > 0 ? "on" : "off");
+            self.log("%s (bulb) reported as %s", self.name, self.onState ? "on" : "off");
             self.brightness = Math.round(self._capabilities['10008'].split(':').shift() / 255 * 100 );
-            self.log("%s (bulb) reported as at %s\% brightness", self.name, self.brightness);
+            self.log("%s (bulb) reported as at %s%% brightness", self.name, self.brightness);
             });
 
         // register eventhandler
@@ -277,7 +301,7 @@ WemoAccessory.prototype._setupListeners = function() {
                     else {
                         self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
 
-                        if(self.onState == false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+                        if(self.onState === false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
                             self.inUse = false;
                             self.updateInUse();
 
@@ -317,14 +341,14 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
     */
     if (this.enddevice.deviceId != deviceId){
         // we get called for every bulb on the link so lets get out of here if the call is for a differnt bulb
-        this.log('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value)
+        this.log('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value);
         return;
         }
     
     if (this._capabilities[capabilityId] === value) {
         // nothing's changed - lets get out of here to stop an endless loop as 
         // this callback was probably triggered by us updating HomeKit
-        this.log('statusChange Ignored (capability): ', deviceId, capabilityId, value)
+        this.log('statusChange Ignored (capability): ', deviceId, capabilityId, value);
         return;
         }
 
@@ -336,30 +360,30 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
     switch(capabilityId) {
         case '10008': // this is a brightness change
             // update our convenience variable ASAP to minimise race condition possibiities
-            this.brightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
+            var newbrightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
  
             // changing wemo bulb brightness always turns them on so lets reflect this locally and in homekit.
             // do we really need this or do we get both status change messages from wemo?
             if (!this.onState){ // if off
-                this.onState = true; // change convenience variable to on and call homekit which will trigger another ignored statusChange
-                this.log('Update homekit onState: %s is %s', this.name, this.onState);
+//                 this.onState = true; // change convenience variable to on and call homekit which will trigger another ignored statusChange
+                this.log('Update homekit onState: %s is %s', this.name, true);
                 this._capabilities['10006'] = '1'; 
-                this.service.getCharacteristic(Characteristic.On).setValue(this.onState);
+                this.service.getCharacteristic(Characteristic.On).setValue(true);
                 }
             
             // call setValue to update HomeKit and iOS (this generates another statusChange that will get ignored)
-            this.log('Update homekit brightness: %s is %s', this.name, this.brightness);
-            this.service.getCharacteristic(Characteristic.Brightness).setValue(this.brightness);
+            this.log('Update homekit brightness: %s is %s', this.name, newbrightness);
+            this.service.getCharacteristic(Characteristic.Brightness).setValue(newbrightness);
 
 
             break;
             
         case '10006': // on/off/etc
             // reflect change of onState from potentially and external change (from Wemo App for instance)
-            this.onState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
+            var newState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
             // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore    
-            this.log('Update homekit onState: %s is %s', this.name, this.onState);
-            this.service.getCharacteristic(Characteristic.On).setValue(this.onState);
+            this.log('Update homekit onState: %s is %s', this.name, newState);
+            this.service.getCharacteristic(Characteristic.On).setValue(newState);
             break;
             
         default:
@@ -480,13 +504,15 @@ WemoAccessory.prototype.getStatus = function (cb) {
 }
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
-//  var client = wemo.client(this.device);
-    if (this._client && this.onState != value) {
+    debug("this.Onstate currently %s, value is %s", this.onState, value );
+    if(this._client && this.onState != value) { // if we have nothing to do so lets leave it at that.
         this.onState = value;
-        this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
+        debug("this.Onstate now: %s", this.onState);
         this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
+        this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
     }
     if (cb) cb(null);
+    
 }
 
 WemoAccessory.prototype.getOnStatus = function (cb) {
@@ -495,16 +521,17 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 }
 
 WemoAccessory.prototype.setBrightness = function (value, cb) {
-//  var client = wemo.client(this.device);
-    if (this._client) {
+    if(this._client && this.brightness != value) { // we have nothing to do so lets leave it at that.
         this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
-        this.log("setBrightness: %s to %s\%", this.name, value);
+        this.log("setBrightness: %s to %s%%", this.name, value);
+        this.brightness = value;
     }
+
     if (cb) cb(null);
 }
 
 WemoAccessory.prototype.getBrightness = function (cb) {
-    this.log("getBrightness: %s is %s\%", this.name, this.brightness)
+    this.log("getBrightness: %s is %s%%", this.name, this.brightness)
     if(cb) cb(null, this.brightness);
 }
 
@@ -518,7 +545,7 @@ WemoAccessory.prototype.updateInUse = function () {
 WemoAccessory.prototype.updateMotionDetected = function() {
     var self = this;
 
-    if (this.onState == true || this._onState == undefined) {
+    if (this.onState === true || this._onState === undefined) {
         if (this.motionTimer) {
             this.log("%s - no motion timer stopped", this.name);
             clearTimeout(this.motionTimer);
