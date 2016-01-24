@@ -47,17 +47,10 @@ module.exports = function (homebridge) {
 function WemoPlatform(log, config) {
     this.log = log;
     this.log("Wemo Platform Plugin Loaded ");
-    this.expectedAccessories = config.expected_accessories || 0 ; // default to false if not specficied
+    this.expectedAccessories = config.expected_accessories || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
-    if(config.homekit_safe) // if homekit_safe parameter defined then use it
-                        { 
-                            this.homekitSafe = config.homekit_safe > 0 ? true : false ;
-                        }
-                        else  // if not defined then we we'll default to safemode true
-                        {
-                            this.homekitSafe = true;
-                        }
-                        
+    this.homekitSafe = config.homekit_safe && (config.homekit_safe > 0 ? true : false) || true; // default to true if not specficied
+
     // if we have been not been told how many accessories to find then homekit safe is off.
     if(!this.expectedAccessories) { this.homekitSafe = false; }
 
