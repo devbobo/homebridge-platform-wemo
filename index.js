@@ -49,6 +49,7 @@ module.exports = function (homebridge) {
 function WemoPlatform(log, config) {
     this.log = log;
     this.log("Wemo Platform Plugin Loaded ");
+    this.devices = {};
     this.expectedAccessories = config.expected_accessories || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
     this.homekitSafe = config.homekit_safe && (config.homekit_safe > 0 ? true : false) || true; // default to true if not specficied
@@ -126,11 +127,9 @@ WemoPlatform.prototype = {
             }
             else if (device.deviceType !== Wemo.DEVICE_TYPE.Maker) {
                 var accessory;
-                console.log("got device ? ");
-                console.log(self.devices[device.macAddress]);
                 if (self.devices[device.macAddress] !== undefined) {
                     accessory = self.devices[device.macAddress];
-                    self.log("Online: %s", accessory.name);
+                    self.log("Online: %s [%s]", accessory.name, device.macAddress);
                     accessory.initialize(device);
                 }
                 else if (canAddAccessory === true) {
@@ -143,7 +142,7 @@ WemoPlatform.prototype = {
 
         var addDiscoveredDevice = function(device) {
             if (self.devices[device.macAddress] === undefined) {
-                self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
+                self.log("Found: %s [%s], type: %s", device.friendlyName, device.macAddress, device.deviceType.split(":")[3]);
             }
 
             var persistDevice = {
@@ -173,8 +172,6 @@ WemoPlatform.prototype = {
         }
 
         wemo.discover(addDiscoveredDevice);
-        wemo.discover(addDiscoveredDevice);
-        wemo.discover(addDiscoveredDevice);
 
         // we'll wait here for the accessories to be found unless the specified number of 
         // accessories has already been found in which case the timeout is cancelled!!
@@ -182,7 +179,7 @@ WemoPlatform.prototype = {
         var timer = setTimeout(function () {
             Storage.forEach(function(key, device) {
                 if (device.macAddress !== undefined && foundDevices.indexOf(key) == -1) {
-                    console.log("Not found: %s", device.friendlyName);
+                    self.log("Not found: %s [%s]", device.friendlyName, device.macAddress);
                     addDevice(device, false);
                 }
             });
@@ -236,16 +233,12 @@ function WemoAccessory(log, device, enddevice, discovered) {
     }
 
     if (discovered !== false) {
-    //    wemo.load(device.setupURL, function(device) {
-    //        console.log("GOT DEVICE");
-    //        self._client = wemo.client(device);
-    //        self._setupListeners();
-    //    });
-    //}
-    //else {
-    //    this._client = wemo.client(device);
-    //    this._setupListeners();
         this.initialize(device);
+    }
+    else {
+        wemo.load(device.setupURL, function(device) {
+            self.initialize(device);
+        });
     }
 }
 
@@ -274,13 +267,13 @@ WemoAccessory.prototype._setupListeners = function() {
     else {
         // set onState for convenience
         this.onState = this.device.binaryState > 0 ? true : false ;
-        this.log("%s is %s", this.name, this.onState);
+        //this.log("%s is %s", this.name, this.onState);
 
         // register eventhandler
         var timer = null;
 
         this._client.on('binaryState', function(state){
-            self.log('%s binaryState: %s', this.name, state > 0 ? "on" : "off");
+            //self.log('%s binaryState: %s', this.name, state > 0 ? "on" : "off");
             self.onState = state > 0 ? true : false ;
 
             if (self.service) {
@@ -377,7 +370,7 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
             break;
             
         default:
-            console.log("This capability (%s) not implemented", capabilityId);
+            this.log("This capability (%s) not implemented", capabilityId);
     }
 }
 
@@ -442,7 +435,7 @@ WemoAccessory.prototype.getServices = function () {
             services.push(this.service);
             break;
         default:
-            console.log("Not implemented");
+            this.log("Not implemented");
     }
     //  this.log("Services for %s: ", this.name, services);
     return services;
