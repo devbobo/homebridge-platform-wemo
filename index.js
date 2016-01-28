@@ -1,4 +1,5 @@
 /* jshint node: true */
+
 // Wemo Platform Plugin for HomeBridge (https://github.com/nfarina/homebridge)
 //
 // Remember to add platform to config.json. Example:
@@ -17,6 +18,7 @@
 
 var Accessory, Characteristic, PowerConsumption, Service, uuid;
 var Wemo = require('wemo-client');
+var Storage = require('node-persist');
 var wemo = new Wemo();
 var debug = require('debug')('homebridge-platform-wemo');
 
@@ -47,6 +49,7 @@ module.exports = function (homebridge) {
 function WemoPlatform(log, config) {
     this.log = log;
     this.log("Wemo Platform Plugin Loaded ");
+    this.devices = {};
     this.expectedAccessories = config.expected_accessories || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
     this.homekitSafe = config.homekit_safe && (config.homekit_safe > 0 ? true : false) || true; // default to true if not specficied
@@ -59,49 +62,131 @@ function WemoPlatform(log, config) {
 
 WemoPlatform.prototype = {
     accessories: function (callback) {
-        this.log("Fetching the Wemo Accessories, expecting %s and will wait %s seconds to find them.",
-            this.expectedAccessories ? this.expectedAccessories : "an unknown number" , this.timeout);
+        Storage.initSync({dir: this.persistPath()});
         var foundAccessories = [];
+        var foundDevices = [];
         var self = this;
-        wemo.discover(function (device) {
-            self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
+        var canAddAccessory = true;
+
+        var addDevice = function(device, discovered) {
             if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
-                var client = this.client(device);
-                client.getEndDevices(function (err, enddevices) {
-                    // this calls us back with an array of enddevices (bulbs)
-                    for (var i = 0, tot = enddevices.length; i < tot; i++) {
-                        self.log("Found endDevice: %s, id: %s", enddevices[i].friendlyName, enddevices[i].deviceId);
-                        var accessory = new WemoAccessory(self.log, device, enddevices[i]);
-                        foundAccessories.push(accessory);
-                        self.log("Discovered %s accessories of %s ",
-                                    foundAccessories.length,
-                                    self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")
-                        if (foundAccessories.length == self.expectedAccessories){
-                            if (timer) {clearTimeout(timer);}
-                            callback(foundAccessories);
+                if (discovered === true) {
+                    var foundDeviceIds = [];
+                    var client = wemo.client(device);
+
+                    client.getEndDevices(function (err, enddevices) {
+                        // this calls us back with an array of enddevices (bulbs)
+                        for (var i = 0, tot = enddevices.length; i < tot; i++) {
+                            self.log("Found endDevice: %s, id: %s", enddevices[i].friendlyName, enddevices[i].deviceId);
+
+                            var persistEndDevice = {
+                                deviceId: enddevices[i].deviceId,
+                                deviceType: enddevices[i].deviceType,
+                                friendlyName: enddevices[i].friendlyName,
+                                capabilities: enddevices[i].capabilities
+                            }
+
+                            Storage.setItemSync(
+                                enddevices[i].deviceId,
+                                persistEndDevice
+                            );
+
+                            foundDeviceIds.push(enddevices[i].deviceId);
+                            
+                            var accessory ;
+
+                            if (self.devices[enddevices[i].deviceId] !== undefined) {
+                                accessory = self.devices[enddevices[i].deviceId];
+                                self.log("Online: %s", accessory.name);
+                                accessory.initialize(device);
+                            }
+                            else if (canAddAccessory === true) {
+                                accessory = new WemoAccessory(self.log, device, enddevices[i], discovered);
+                                foundAccessories.push(accessory);
+                                self.devices[enddevices[i].deviceId] = accessory;
+                            }
                         }
-                    }
-                });
-            } else if (device.deviceType !== Wemo.DEVICE_TYPE.Maker) {
-                var accessory = new WemoAccessory(self.log, device, null);
-                foundAccessories.push(accessory);
-                self.log("Discovered %s accessories of %s ",
-                            foundAccessories.length,
-                            self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories");
-                if (foundAccessories.length == self.expectedAccessories)
-                    {
-                    self.log("Woohoo!!! all %s accessories found.", self.expectedAccessories );
-                    if (timer) {clearTimeout(timer);} // if setTimeout got called already cancel it.
-                    callback(foundAccessories);
+
+                        var persistDevice = Storage.getItemSync(device.macAddress);
+                        persistDevice.enddevices = foundDeviceIds;
+
+                        Storage.setItemSync(
+                            device.macAddress,
+                            persistDevice
+                        );
+                    });
+                }
+                else {
+                    for (var i = 0; i < device.enddevices.length; i++) {
+                        var enddevice = Storage.getItemSync(device.enddevices[i]);
+                        var accessory = new WemoAccessory(self.log, device, enddevice, discovered);
+                        foundAccessories.push(accessory);
+                        self.devices[device.enddevices[i].deviceId] = accessory;
                     }
                 }
-        });
+            }
+            else if (device.deviceType !== Wemo.DEVICE_TYPE.Maker) {
+                var accessory;
+                if (self.devices[device.macAddress] !== undefined) {
+                    accessory = self.devices[device.macAddress];
+                    self.log("Online: %s [%s]", accessory.name, device.macAddress);
+                    accessory.initialize(device);
+                }
+                else if (canAddAccessory === true) {
+                    accessory = new WemoAccessory(self.log, device, null, discovered);
+                    foundAccessories.push(accessory);
+                    self.devices[device.macAddress] = accessory;
+                }
+            }
+        };
+
+        var addDiscoveredDevice = function(device) {
+            if (self.devices[device.macAddress] === undefined) {
+                self.log("Found: %s [%s], type: %s", device.friendlyName, device.macAddress, device.deviceType.split(":")[3]);
+            }
+
+            var persistDevice = {
+                deviceType: device.deviceType,
+                friendlyName: device.friendlyName,
+                modelName: device.modelName,
+                modelNumber: device.modelNumber,
+                serialNumber: device.serialNumber,
+                UDN: device.UDN,
+                UPC: device.UPC,
+                macAddress: device.macAddress,
+                setupURL: 'http://' + device.host + ':' + device.port + "/setup.xml"
+            }
+
+            if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
+                persistDevice.enddevices = [];
+            }
+
+            Storage.setItemSync(
+                device.macAddress,
+                persistDevice
+            );
+
+            foundDevices.push(device.macAddress);
+
+            addDevice(device, true);
+        }
+
+        wemo.discover(addDiscoveredDevice);
 
         // we'll wait here for the accessories to be found unless the specified number of 
         // accessories has already been found in which case the timeout is cancelled!!
 
         var timer = setTimeout(function () {
-            if(self.expectedAccessories) {
+            Storage.forEach(function(key, device) {
+                if (device.macAddress !== undefined && foundDevices.indexOf(key) == -1) {
+                    self.log("Not found: %s [%s]", device.friendlyName, device.macAddress);
+                    addDevice(device, false);
+                }
+            });
+
+            canAddAccessory = false;
+
+            if(self.expectedAccessories != foundAccessories.length) {
                 self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json",
                     foundAccessories.length, self.expectedAccessories);
                 if(self.homekitSafe) {
@@ -109,17 +194,31 @@ WemoPlatform.prototype = {
                     throw new Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
                 }
             }
+
             callback(foundAccessories);
         }, self.timeout * 1000);
+        
+        setInterval(
+            function(){
+                wemo.discover(addDiscoveredDevice);
+            }, 
+            60000
+        );
     },
 };
 
-function WemoAccessory(log, device, enddevice) {
+WemoPlatform.prototype.persistPath = function() {
+    var path = require('path');
+
+    var home = process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
+    return path.join(home, ".homebridge-platform-wemo", "persist");
+}
+
+function WemoAccessory(log, device, enddevice, discovered) {
     var self = this;
 
     this.device = device;
     this.log = log;
-    this._client = wemo.client(device);
 
     if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
         this.id = device.deviceId;
@@ -127,7 +226,31 @@ function WemoAccessory(log, device, enddevice) {
         this.enddevice = enddevice;
         this.brightness = null;
         this._capabilities = enddevice.capabilities;
+    }
+    else {
+        this.id = device.macAddress;
+        this.name = device.friendlyName;
+    }
 
+    if (discovered !== false) {
+        this.initialize(device);
+    }
+    else {
+        wemo.load(device.setupURL, function(device) {
+            self.initialize(device);
+        });
+    }
+}
+
+WemoAccessory.prototype.initialize = function(device) {
+    this._client = wemo.client(device);
+    this._setupListeners();
+}
+
+WemoAccessory.prototype._setupListeners = function() {
+    var self = this;
+
+    if(this.device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
         // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
         this.getStatus(function (err) {
             self.onState = (self._capabilities['10006'].substr(0,1) === '1') ? true : false ;
@@ -140,19 +263,17 @@ function WemoAccessory(log, device, enddevice) {
         this._client.on('statusChange', function(deviceId, capabilityId, value) {
             self._statusChange(deviceId, capabilityId, value);
         });
-    } else {
-        this.id = device.macAddress;
-        this.name = device.friendlyName;
-
+    }
+    else {
         // set onState for convenience
-        this.onState = device.binaryState > 0 ? true : false ;
-        this.log("%s is %s", this.name, this.onState);
+        this.onState = this.device.binaryState > 0 ? true : false ;
+        //this.log("%s is %s", this.name, this.onState);
 
         // register eventhandler
         var timer = null;
 
         this._client.on('binaryState', function(state){
-            self.log('%s binaryState: %s', this.name, state > 0 ? "on" : "off");
+            //self.log('%s binaryState: %s', this.name, state > 0 ? "on" : "off");
             self.onState = state > 0 ? true : false ;
 
             if (self.service) {
@@ -177,7 +298,7 @@ function WemoAccessory(log, device, enddevice) {
             }
         }.bind(this));
 
-        if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+        if(this.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
             this._client.on('insightParams', function(state, power){
                 //self.log('%s inUse: %s', this.name, state);
                 self.inUse = state == 1 ? true : false ;
@@ -203,18 +324,18 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
     */
     if (this.enddevice.deviceId != deviceId){
         // we get called for every bulb on the link so lets get out of here if the call is for a differnt bulb
-        this.log('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value);
+        debug('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value);
         return;
         }
     
     if (this._capabilities[capabilityId] === value) {
         // nothing's changed - lets get out of here to stop an endless loop as 
         // this callback was probably triggered by us updating HomeKit
-        this.log('statusChange Ignored (capability): ', deviceId, capabilityId, value);
+        debug('statusChange Ignored (capability): ', deviceId, capabilityId, value);
         return;
         }
 
-    this.log('statusChange processing: ', deviceId, capabilityId, value);
+    debug('statusChange processing: ', deviceId, capabilityId, value);
 
     // update our internal array with newly passed value.
     this._capabilities[capabilityId] = value;
@@ -228,13 +349,13 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
             // do we really need this or do we get both status change messages from wemo?
             if (!this.onState){ // if off
 //                 this.onState = true; // change convenience variable to on and call homekit which will trigger another ignored statusChange
-                this.log('Update homekit onState: %s is %s', this.name, true);
+                debug('Update homekit onState: %s is %s', this.name, true);
                 this._capabilities['10006'] = '1'; 
                 this.service.getCharacteristic(Characteristic.On).setValue(true);
                 }
             
             // call setValue to update HomeKit and iOS (this generates another statusChange that will get ignored)
-            this.log('Update homekit brightness: %s is %s', this.name, newbrightness);
+            debug('Update homekit brightness: %s is %s', this.name, newbrightness);
             this.service.getCharacteristic(Characteristic.Brightness).setValue(newbrightness);
 
 
@@ -244,12 +365,12 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
             // reflect change of onState from potentially and external change (from Wemo App for instance)
             var newState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
             // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore    
-            this.log('Update homekit onState: %s is %s', this.name, newState);
+            debug('Update homekit onState: %s is %s', this.name, newState);
             this.service.getCharacteristic(Characteristic.On).setValue(newState);
             break;
             
         default:
-            console.log("This capability (%s) not implemented", capabilityId);
+            this.log("This capability (%s) not implemented", capabilityId);
     }
 }
 
@@ -314,7 +435,7 @@ WemoAccessory.prototype.getServices = function () {
             services.push(this.service);
             break;
         default:
-            console.log("Not implemented");
+            this.log("Not implemented");
     }
     //  this.log("Services for %s: ", this.name, services);
     return services;
@@ -323,7 +444,6 @@ WemoAccessory.prototype.getServices = function () {
 WemoAccessory.prototype.setOn = function (value, cb) {
 
     if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
-//         this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
         this._client.setBinaryState(value ? 1 : 0, function (err){
             if(!err) {
                 this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");                
@@ -376,9 +496,8 @@ WemoAccessory.prototype.getStatus = function (cb) {
 }
 
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
-//  var client = wemo.client(this.device);
     debug("this.Onstate currently %s, value is %s", this.onState, value );
-    if(this.onState != value) { // if we have nothing to do so lets leave it at that.
+    if(this._client && this.onState != value) { // if we have nothing to do so lets leave it at that.
         this.onState = value;
         debug("this.Onstate now: %s", this.onState);
         this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
@@ -394,12 +513,12 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 }
 
 WemoAccessory.prototype.setBrightness = function (value, cb) {
-//  var client = wemo.client(this.device);
-    if(this.brightness != value) { // we have nothing to do so lets leave it at that.
+    if(this._client && this.brightness != value) { // we have nothing to do so lets leave it at that.
         this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
         this.log("setBrightness: %s to %s%%", this.name, value);
         this.brightness = value;
-        }
+    }
+
     if (cb) cb(null);
 }
 
