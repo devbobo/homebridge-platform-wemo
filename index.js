@@ -323,11 +323,20 @@ WemoAccessory.prototype.getServices = function () {
 WemoAccessory.prototype.setOn = function (value, cb) {
 
     if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
-        this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
-        this._client.setBinaryState(value ? 1 : 0);
-        this.onState = value;
-        }
-    if (cb) cb(null);
+//         this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
+        this._client.setBinaryState(value ? 1 : 0, function (err){
+            if(!err) {
+                this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");                
+                this.onState = value;
+                if (cb) cb(null);
+            } else {
+                this.log("setOn: FAILED setting %s to %s. Error: %s", this.name, value > 0 ? "on" : "off", err.code);
+                if (cb) cb(new Error(err));
+            }
+        }.bind(this));
+    } else {
+        if (cb) cb(null);
+    }
 }
 
 WemoAccessory.prototype.getOn = function (cb) {
