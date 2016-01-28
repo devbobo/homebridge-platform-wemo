@@ -130,6 +130,7 @@ WemoPlatform.prototype = {
                 if (self.devices[device.macAddress] !== undefined) {
                     accessory = self.devices[device.macAddress];
                     self.log("Online: %s [%s]", accessory.name, device.macAddress);
+                    accessory.available = true; // need to make the device availalble for activating.
                     accessory.initialize(device);
                 }
                 else if (canAddAccessory === true) {
@@ -219,6 +220,7 @@ function WemoAccessory(log, device, enddevice, discovered) {
 
     this.device = device;
     this.log = log;
+    this.onState = -1; // lets start at unknown state!
 
     if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
         this.id = device.deviceId;
@@ -231,7 +233,9 @@ function WemoAccessory(log, device, enddevice, discovered) {
         this.id = device.macAddress;
         this.name = device.friendlyName;
     }
-
+    
+    this.available = discovered;
+    
     if (discovered !== false) {
         this.initialize(device);
     }
@@ -442,25 +446,28 @@ WemoAccessory.prototype.getServices = function () {
 };
 
 WemoAccessory.prototype.setOn = function (value, cb) {
-
-    if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
-        this._client.setBinaryState(value ? 1 : 0, function (err){
-            if(!err) {
-                this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");                
-                this.onState = value;
-                if (cb) cb(null);
-            } else {
-                this.log("setOn: FAILED setting %s to %s. Error: %s", this.name, value > 0 ? "on" : "off", err.code);
-                if (cb) cb(new Error(err));
-            }
-        }.bind(this));
+    if (this.available) {
+        if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
+            this._client.setBinaryState(value ? 1 : 0, function (err){
+                if(!err) {
+                    this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");                
+                    this.onState = value;
+                    if (cb) cb(null);
+                } else {
+                    this.log("setOn: FAILED setting %s to %s. Error: %s", this.name, value > 0 ? "on" : "off", err.code);
+                    if (cb) cb(new Error(err));
+                }
+            }.bind(this));
+        } else {
+            if (cb) cb(null);
+        }        
     } else {
-        if (cb) cb(null);
+        if(cb) cb(new Error('Not Available'));
     }
 }
 
 WemoAccessory.prototype.getOn = function (cb) {
-    this.log("getOn: %s is %s ", this.name, this.onState > 0 ? "on" : "off");
+    this.log("getOn: %s is %s ", this.name, (this.onState === -1 ) ? 'unknown':this.onState > 0 ? "on" : "off");
     if (cb) cb(null, this.onState);
 }
 
