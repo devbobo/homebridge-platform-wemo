@@ -53,6 +53,9 @@ function WemoPlatform(log, config) {
 
     // if we have been not been told how many accessories to find then homekit safe is off.
     if(!this.expectedAccessories) { this.homekitSafe = false; }
+    
+    log('config:', config);
+    log('homekitsafe:', this.homekitSafe);
 
     noMotionTimer = config.no_motion_timer || 60;
 }
