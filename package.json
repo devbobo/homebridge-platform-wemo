@@ -19,7 +19,7 @@
 
   "dependencies": {
     "request": "^2.65.0",
-    "wemo-client": "https://github.com/rudders/wemo-client.git",
+    "wemo-client": "https://github.com/rudders/wemo-client#bulb-groups",
     "debug" : "*"
   }
 }

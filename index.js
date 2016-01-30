@@ -109,7 +109,7 @@ WemoPlatform.prototype = {
                 self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json",
                     foundAccessories.length, self.expectedAccessories);
                 if(self.homekitSafe) {
-                    self.log("and you have indicited you'd like to keep your HomeKit config safe so we're crashing out");
+                    self.log("and you have indicated you'd like to keep your HomeKit config safe so we're crashing out");
                     throw new Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
                 }
             }
