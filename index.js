@@ -50,13 +50,13 @@ function WemoPlatform(log, config) {
     this.log = log;
     this.log("Wemo Platform Plugin Loaded ");
     this.devices = {};
-    this.expectedAccessories = config.expected_accessories || 0; // default to false if not specficied
+    this.expectedAccessories = parseInt(config.expected_accessories) || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
-    this.homekitSafe = config.homekit_safe && (config.homekit_safe > 0 ? true : false) || true; // default to true if not specficied
-
+    this.homekitSafe = (isNaN(parseInt(config.homekit_safe, 10)) ) ? true : parseInt(config.homekit_safe, 10) > 0 ? true : false;
+        
     // if we have been not been told how many accessories to find then homekit safe is off.
-    if(this.expectedAccessories == '0') { this.homekitSafe = false; }
-
+    if(!this.expectedAccessories) { this.homekitSafe = false; }
+    
     noMotionTimer = config.no_motion_timer || 60;
 }
 
@@ -191,7 +191,7 @@ WemoPlatform.prototype = {
                 self.log("We have timed out and only discovered %s of the specified %s devices - try restarting homebridge or increasing timeout in config.json",
                     foundAccessories.length, self.expectedAccessories);
                 if(self.homekitSafe) {
-                    self.log("and you have indicited you'd like to keep your HomeKit config safe so we're crashing out");
+                    self.log("and you have indicated you'd like to keep your HomeKit config safe so we're crashing out");
                     throw new Error("homebridge-wemo-platform has intentially bought down HomeBridge - please restart - sorry but it's your HomeKit configuration we're protecting!");
                 }
             }
