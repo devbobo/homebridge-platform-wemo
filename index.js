@@ -49,14 +49,11 @@ function WemoPlatform(log, config) {
     this.log("Wemo Platform Plugin Loaded ");
     this.expectedAccessories = parseInt(config.expected_accessories) || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
-    this.homekitSafe = config.homekit_safe && (config.homekit_safe > 0 ? true : false) || true; // default to true if not specficied
-
+    this.homekitSafe = (isNaN(parseInt(config.homekit_safe, 10)) ) ? true : parseInt(config.homekit_safe, 10) > 0 ? true : false;
+        
     // if we have been not been told how many accessories to find then homekit safe is off.
     if(!this.expectedAccessories) { this.homekitSafe = false; }
     
-    log('config:', config);
-    log('homekitsafe:', this.homekitSafe);
-
     noMotionTimer = config.no_motion_timer || 60;
 }
 
@@ -72,7 +69,7 @@ WemoPlatform.prototype = {
                 var client = this.client(device);
                 client.getEndDevices(function (err, enddevices) {
                     // this calls us back with an array of enddevices (bulbs)
-                    self.log("%s EndDevices found in:", enddevices.length, enddevices );
+                    self.log("%s EndDevices found in:", enddevices.length );
                     for (var i = 0, tot = enddevices.length; i < tot; i++) {
                         self.log("Found endDevice: %s, id: %s", enddevices[i].friendlyName, enddevices[i].deviceId);
                         var accessory = new WemoAccessory(self.log, device, enddevices[i]);
