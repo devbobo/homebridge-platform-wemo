@@ -66,7 +66,7 @@ WemoPlatform.prototype = {
         wemo.discover(function (device) {
             self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
             if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
-                var client = this.client(device);
+                var client = this.client(device , self.log);
                 client.getEndDevices(function (err, enddevices) {
                     // this calls us back with an array of enddevices (bulbs)
                     self.log("%s EndDevices found in:", enddevices.length );
@@ -120,7 +120,7 @@ function WemoAccessory(log, device, enddevice) {
 
     this.device = device;
     this.log = log;
-    this._client = wemo.client(device);
+    this._client = wemo.client(device, log);
 
     if(device.deviceType === Wemo.DEVICE_TYPE.Bridge) {
         this.id = device.deviceId;
