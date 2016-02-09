@@ -6,20 +6,17 @@
   "keywords": [
     "homebridge-plugin"
   ],
-
   "repository": {
     "type": "git",
     "url": "git://github.com/rudders/homebridge-platform-wemo.git"
   },
-
   "engines": {
     "node": ">=0.12.0",
     "homebridge": ">=0.2.0"
   },
-
   "dependencies": {
     "request": "^2.65.0",
     "wemo-client": "https://github.com/rudders/wemo-client.git",
-    "debug" : "*"
+    "debug": "*"
   }
 }

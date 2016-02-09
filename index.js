@@ -77,7 +77,7 @@ WemoPlatform.prototype = {
                         self.log("Discovered %s accessories of %s ",
                                     foundAccessories.length,
                                     self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories")
-                        if (foundAccessories.length == self.expectedAccessories){
+                        if (foundAccessories.length === self.expectedAccessories){
                             if (timer) {clearTimeout(timer);}
                             callback(foundAccessories);
                         }
@@ -89,7 +89,7 @@ WemoPlatform.prototype = {
                 self.log("Discovered %s accessories of %s ",
                             foundAccessories.length,
                             self.expectedAccessories ? self.expectedAccessories : "an unspecified number of accessories");
-                if (foundAccessories.length == self.expectedAccessories)
+                if (foundAccessories.length === self.expectedAccessories)
                     {
                     self.log("Woohoo!!! all %s accessories found.", self.expectedAccessories );
                     if (timer) {clearTimeout(timer);} // if setTimeout got called already cancel it.
@@ -157,8 +157,8 @@ function WemoAccessory(log, device, enddevice) {
             self.onState = state > 0 ? true : false ;
 
             if (self.service) {
-                if (self.onState != self._onState) {
-                    if (self.device.deviceType == Wemo.DEVICE_TYPE.Motion || self.device.deviceType == "urn:Belkin:device:NetCamSensor:1") {
+                if (self.onState !== self._onState) {
+                    if (self.device.deviceType === Wemo.DEVICE_TYPE.Motion || self.device.deviceType === "urn:Belkin:device:NetCamSensor:1") {
                         self.updateMotionDetected();
                     }
                     else {
@@ -181,7 +181,7 @@ function WemoAccessory(log, device, enddevice) {
         if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
             this._client.on('insightParams', function(state, power){
                 //self.log('%s inUse: %s', this.name, state);
-                self.inUse = state == 1 ? true : false ;
+                self.inUse = state === 1 ? true : false ;
                 self.powerUsage = Math.round(power / 100) / 10;
 
                 if (self.service) {
@@ -202,7 +202,7 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
          to do that we need to use setValue which triggers another call back to here which
          we need to ignore - much of this function deals with the idiosyncrasies around this issue.
     */
-    if (this.enddevice.deviceId != deviceId){
+    if (this.enddevice.deviceId !== deviceId){
         // we get called for every bulb on the link so lets get out of here if the call is for a differnt bulb
         this.log('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value);
         return;
@@ -324,7 +324,7 @@ WemoAccessory.prototype.getServices = function () {
 
 WemoAccessory.prototype.setOn = function (value, cb) {
 
-    if (this.onState != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
+    if (this.onState !== value) {  //remove redundent calls to setBinaryState when requested state is already achieved
 //         this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
         this._client.setBinaryState(value ? 1 : 0, function (err){
             if(!err) {
@@ -380,7 +380,7 @@ WemoAccessory.prototype.getStatus = function (cb) {
 WemoAccessory.prototype.setOnStatus = function (value, cb) {
 //  var client = wemo.client(this.device);
     debug("this.Onstate currently %s, value is %s", this.onState, value );
-    if(this.onState != value) { // if we have nothing to do so lets leave it at that.
+    if(this.onState !== value) { // if we have nothing to do so lets leave it at that.
         this.onState = value;
         debug("this.Onstate now: %s", this.onState);
         this.log("setOnStatus: %s to %s", this.name, value > 0 ? "on" : "off");
@@ -397,7 +397,7 @@ WemoAccessory.prototype.getOnStatus = function (cb) {
 
 WemoAccessory.prototype.setBrightness = function (value, cb) {
 //  var client = wemo.client(this.device);
-    if(this.brightness != value) { // we have nothing to do so lets leave it at that.
+    if(this.brightness !== value) { // we have nothing to do so lets leave it at that.
         this._client.setDeviceStatus(this.enddevice.deviceId, 10008, value*255/100 );
         this.log("setBrightness: %s to %s%%", this.name, value);
         this.brightness = value;
@@ -411,7 +411,7 @@ WemoAccessory.prototype.getBrightness = function (cb) {
 }
 
 WemoAccessory.prototype.updateInUse = function () {
-    if (this.inUse != this._inUse) {
+    if (this.inUse !== this._inUse) {
         this.service.getCharacteristic(Characteristic.OutletInUse).setValue(this.inUse);
         this._inUse = this.inUse;
     }
@@ -443,7 +443,7 @@ WemoAccessory.prototype.updateMotionDetected = function() {
 }
 
 WemoAccessory.prototype.updatePowerUsage = function () {
-    if (this.powerUsage != this._powerUsage) {
+    if (this.powerUsage !== this._powerUsage) {
         this.service.getCharacteristic(PowerConsumption).setValue(this.powerUsage);
         this._powerUsage = this.powerUsage;
     }
