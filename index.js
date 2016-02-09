@@ -300,6 +300,7 @@ WemoAccessory.prototype.getServices = function () {
             break;
         case Wemo.DEVICE_TYPE.Switch:
         case "urn:Belkin:device:lightswitch:1":
+        case "urn:Belkin:device:CoffeeMaker:1":
             this.service = new Service.Switch(this.name);
 
             this.service.getCharacteristic(Characteristic.On).on('set', this.setOn.bind(this)).on('get', this.getOn.bind(this));
