@@ -169,6 +169,10 @@ WemoPlatform.prototype.configureAccessory = function(accessory) {
 WemoPlatform.prototype.configurationRequestHandler = function(context, request, callback) {
     var respDict = {};
 
+    if (request && request.type === "Terminate") {
+        context.onScreen = null;
+    }
+
     switch(context.onScreen) {
         case "Remove":
             if (request.response.selections) {
@@ -182,9 +186,7 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                     "type": "Interface",
                     "interface": "instruction",
                     "title": "Finished",
-                    "detail": "Accessory removal was successful.",
-                    "showNextButton": true
-                }
+                    "detail": "Accessory removal was successful."
 
                 context.onScreen = "Complete";
                 callback(respDict);
@@ -192,7 +194,7 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
             }
         case "Complete":
         default:
-            if (request && request.response) {
+            if (request && (request.response || request.type === "Terminate")) {
                 context.onScreen = null;
                 callback(respDict, "platform", true, this.config);
             }
