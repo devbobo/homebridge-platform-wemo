@@ -183,7 +183,8 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                         "type": "Interface",
                         "interface": "instruction",
                         "title": "Finished",
-                        "detail": "Accessory removal was successful."
+                        "detail": "Accessory removal was successful.",
+                        "showNextButton": true
                     }
 
                     context.onScreen = "Complete";
