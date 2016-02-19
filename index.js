@@ -139,12 +139,12 @@ WemoPlatform.prototype.addAccessory = function(device) {
 
     switch(device.deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
-            service.addOptionalCharacteristic(Characteristic.OutletInUse);
-            service.addOptionalCharacteristic(Consumption);
-            service.addOptionalCharacteristic(TotalConsumption);
+            service.addCharacteristic(Characteristic.OutletInUse);
+            service.addCharacteristic(Consumption);
+            service.addCharacteristic(TotalConsumption);
             break;
         case Wemo.DEVICE_TYPE.Maker:
-            service.addOptionalCharacteristic(Characteristic.ContactSensorState);
+            service.addCharacteristic(Characteristic.ContactSensorState);
             break;
     }
 
@@ -156,7 +156,7 @@ WemoPlatform.prototype.addLinkAccessory = function(link, device) {
     this.log("Found: %s [%s]", device.friendlyName, device.deviceId);
 
     var accessory = new Accessory(device.friendlyName, UUIDGen.generate(device.deviceId));
-    accessory.addService(Service.Lightbulb);
+    accessory.addService(Service.Lightbulb).addCharacteristic(Characteristic.Brightness);
 
     this.accessories[accessory.UUID] = new WemoLinkAccessory(this.log, accessory, link, device);
     this.api.registerPlatformAccessories("homebridge-platform-wemo", "BelkinWeMo", [accessory]);
@@ -167,20 +167,28 @@ WemoPlatform.prototype.configureAccessory = function(accessory) {
 }
 
 WemoPlatform.prototype.configurationRequestHandler = function(context, request, callback) {
+    var self = this;
     var respDict = {};
 
     if (request && request.type === "Terminate") {
         context.onScreen = null;
     }
 
+    var sortAccessories = function() {
+        context.sortedAccessories = Object.keys(self.accessories).map(
+            function(k){return this[k] instanceof Accessory ? this[k] : this[k].accessory},
+            self.accessories
+        ).sort(function(a,b) {if (a.displayName < b.displayName) return -1; if (a.displayName > b.displayName) return 1; return 0});
+
+        return Object.keys(context.sortedAccessories).map(function(k) {return this[k].displayName}, context.sortedAccessories);
+    }
+
     switch(context.onScreen) {
-        case "Remove":
+        case "DoRemove":
             if (request.response.selections) {
                 for (var i in request.response.selections.sort()) {
-                    this.removeAccessory(this.sortedAccessories[request.response.selections[i]]);
+                    this.removeAccessory(context.sortedAccessories[request.response.selections[i]]);
                 }
-
-                this.sortedAccessories = null;
 
                 respDict = {
                     "type": "Interface",
@@ -189,33 +197,43 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                     "detail": "Accessory removal was successful."
                 }
 
-                context.onScreen = "Complete";
+                context.onScreen = null;
                 callback(respDict);
-                break;
             }
-        case "Complete":
+            else {
+                context.onScreen = null;
+                callback(respDict, "platform", true, this.config);
+            }
+            break;
+        case "Menu":
+            context.onScreen = "Remove";
+        case "Remove":
+            respDict = {
+                "type": "Interface",
+                "interface": "list",
+                "title": "Select accessory to " + context.onScreen.toLowerCase(),
+                "allowMultipleSelection": context.onScreen == "Remove",
+                "items": sortAccessories()
+            }
+
+            context.onScreen = "Do" + context.onScreen;
+            callback(respDict);
+            break;
         default:
             if (request && (request.response || request.type === "Terminate")) {
                 context.onScreen = null;
                 callback(respDict, "platform", true, this.config);
             }
             else {
-                this.sortedAccessories = Object.keys(this.accessories).map(
-                    function(k){return this[k] instanceof Accessory ? this[k] : this[k].accessory},
-                    this.accessories
-                ).sort(function(a,b) {if (a.displayName < b.displayName) return -1; if (a.displayName > b.displayName) return 1; return 0});
-
-                var names = Object.keys(this.sortedAccessories).map(function(k) {return this[k].displayName}, this.sortedAccessories);
-
                 respDict = {
                     "type": "Interface",
                     "interface": "list",
-                    "title": "Select accessory to remove",
-                    "allowMultipleSelection": true,
-                    "items": names
+                    "title": "Select option",
+                    "allowMultipleSelection": false,
+                    "items": ["Remove Accessory"]
                 }
 
-                context.onScreen = "Remove";
+                context.onScreen = "Menu";
                 callback(respDict);
             }
     }
@@ -240,59 +258,9 @@ function WemoAccessory(log, accessory, device) {
     this.log = log;
     this.client = wemo.client(device, log);
     this.onState = false;
-
-    accessory.updateReachability(true);
-
     this.service = this.getService();
 
-    switch(device.deviceType) {
-        case Wemo.DEVICE_TYPE.Insight:
-            this.service
-                .getCharacteristic(Characteristic.On)
-                .on('get', function(callback) {callback(null, self.onState)})
-                .on('set', this.setOn.bind(this));
-
-            this.service
-                .getCharacteristic(Characteristic.OutletInUse)
-                .on('get', function(callback) {callback(null, self.inUse)});
-
-            this.service
-                .getCharacteristic(Consumption)
-                .on('get', function(callback) {callback(null, self.powerUsage)});
-
-            this.service
-                .getCharacteristic(TotalConsumption)
-                .on('get', function(callback) {callback(null, self.totalUsage)});
-
-            break;
-        case Wemo.DEVICE_TYPE.Maker:
-            this.onSensor = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
-
-            this.service
-                .getCharacteristic(Characteristic.On)
-                .on('get', function(callback) {callback(null, self.onState)})
-                .on('set', this.setOn.bind(this));
-
-            this.service
-                .getCharacteristic(Characteristic.ContactSensorState)
-                .on('get', function(callback) {callback(null, self.onSensor)});
-
-            break;
-        case Wemo.DEVICE_TYPE.Switch:
-        case "urn:Belkin:device:lightswitch:1":
-            this.service
-                .getCharacteristic(Characteristic.On)
-                .on('get', function(callback) {callback(null, self.onState)})
-                .on('set', this.setOn.bind(this));
-
-            break;
-        case Wemo.DEVICE_TYPE.Motion:
-        case "urn:Belkin:device:NetCamSensor:1":
-            this.service.getCharacteristic(Characteristic.MotionDetected).on('get', function(callback) {callback(null, self.onState)});
-            break;
-        default:
-            console.log("Not implemented");
-    }
+    this.updateReachability(true);
 
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
@@ -369,7 +337,7 @@ function WemoAccessory(log, accessory, device) {
             self.powerUsage = Math.round(power / 1000);
 
             // not currently returned by wemo-client
-            if (data.TodayPowerConsumed !== undefined) {
+            if (data.TodayConsumed !== undefined) {
                 self.totalUsage = Math.round(data.TodayPowerConsumed / 10000 * 6) / 100;
             }
 
@@ -417,6 +385,54 @@ WemoAccessory.prototype.setOn = function (value, cb) {
     }
 }
 
+WemoAccessory.prototype.updateEventHandlers= function (characteristic) {
+    var self = this;
+
+    if (this.service.testCharacteristic(characteristic) === false) {
+        return;
+    }
+
+    this.service.getCharacteristic(characteristic).removeAllListeners();
+
+    if (this.accessory.reachable !== true) {
+        return;
+    }
+
+    switch(characteristic) {
+        case Characteristic.ContactSensorState:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.onSensor)});
+            break;
+        case Characteristic.MotionDetected:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.onState)});
+            break;
+        case Characteristic.On:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.onState)})
+                .on('set', this.setOn.bind(this));
+            break;
+        case Characteristic.OutletInUse:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.inUse)});
+            break;
+        case Consumption:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.powerUsage)});
+            break;
+        case TotalConsumption:
+            this.service
+                .getCharacteristic(characteristic)
+                .on('get', function(callback) {callback(null, self.totalUsage)});
+            break;
+    }
+}
+
 WemoAccessory.prototype.updateInUse = function () {
     if (this.inUse !== this._inUse) {
         this.service.getCharacteristic(Characteristic.OutletInUse).setValue(this.inUse);
@@ -461,6 +477,33 @@ WemoAccessory.prototype.updatePowerUsage = function () {
     }
 }
 
+WemoAccessory.prototype.updateReachability = function(reachable) {
+    this.accessory.updateReachability(reachable);
+
+    switch(this.device.deviceType) {
+        case Wemo.DEVICE_TYPE.Insight:
+            this.updateEventHandlers(Characteristic.On);
+            this.updateEventHandlers(Characteristic.OutletInUse);
+            this.updateEventHandlers(Consumption);
+            this.updateEventHandlers(TotalConsumption);
+            break;
+        case Wemo.DEVICE_TYPE.Maker:
+            this.updateEventHandlers(Characteristic.On);
+            this.updateEventHandlers(Characteristic.ContactSensorState);
+            break;
+        case Wemo.DEVICE_TYPE.Switch:
+        case "urn:Belkin:device:lightswitch:1":
+            this.updateEventHandlers(Characteristic.On);
+            break;
+        case Wemo.DEVICE_TYPE.Motion:
+        case "urn:Belkin:device:NetCamSensor:1":
+            this.updateEventHandlers(Characteristic.On);
+            break;
+        default:
+            console.log("Not implemented");
+    }
+}
+
 function WemoLinkAccessory(log, accessory, link, device) {
     var self = this;
 
@@ -472,19 +515,7 @@ function WemoLinkAccessory(log, accessory, link, device) {
     this.onState = false;
     this.brightness = null;
 
-    accessory.updateReachability(true);
-
-    var service = this.accessory.getService(Service.Lightbulb)
-
-    service
-        .getCharacteristic(Characteristic.On)
-        .on('set', this.setOnStatus.bind(this))
-        .on('get', function(callback) {callback(null, self.onState)});
-
-    service
-        .getCharacteristic(Characteristic.Brightness)
-        .on('set', this.setBrightness.bind(this))
-        .on('get', function(callback) {callback(null, self.brightness)});
+    this.updateReachability(true);
 
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
@@ -608,6 +639,42 @@ WemoLinkAccessory.prototype.statusChange = function(deviceId, capabilityId, valu
         default:
             console.log("This capability (%s) not implemented", capabilityId);
     }
+}
+
+WemoLinkAccessory.prototype.updateEventHandlers= function (characteristic) {
+    var self = this;
+    var service = this.accessory.getService(Service.Lightbulb)
+
+    if (service.testCharacteristic(characteristic) === false) {
+        return;
+    }
+
+    service.getCharacteristic(characteristic).removeAllListeners();
+
+    if (this.accessory.reachable !== true) {
+        return;
+    }
+
+    switch(characteristic) {
+        case Characteristic.On:
+            service
+                .getCharacteristic(Characteristic.On)
+                .on('set', this.setOnStatus.bind(this))
+                .on('get', function(callback) {callback(null, self.onState)});
+            break;
+        case Characteristic.Brightness:
+            service
+                .getCharacteristic(Characteristic.Brightness)
+                .on('set', this.setBrightness.bind(this))
+                .on('get', function(callback) {callback(null, self.brightness)});
+            break;
+    }
+}
+
+WemoLinkAccessory.prototype.updateReachability = function(reachable) {
+    this.accessory.updateReachability(reachable);
+    this.updateEventHandlers(Characteristic.On);
+    this.updateEventHandlers(Characteristic.Brightness);
 }
 
 function getServiceType(deviceType) {
