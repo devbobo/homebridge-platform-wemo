@@ -338,7 +338,7 @@ function WemoAccessory(log, accessory, device) {
 
             // not currently returned by wemo-client
             if (data.TodayConsumed !== undefined) {
-                self.totalUsage = Math.round(data.TodayPowerConsumed / 10000 * 6) / 100;
+                self.totalUsage = Math.round(data.TodayConsumed / 10000 * 6) / 100;
             }
 
             if (self.service) {
