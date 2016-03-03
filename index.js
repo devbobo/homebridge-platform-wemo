@@ -74,6 +74,11 @@ function WemoPlatform(log, config, api) {
     noMotionTimer = this.config.no_motion_timer || 60;
 
     this.requestServer = http.createServer();
+
+    this.requestServer.on('error', function(err) {
+
+    });
+
     this.requestServer.listen(18093, function() {
         self.log("Server Listening...");
     });
@@ -267,6 +272,11 @@ function WemoAccessory(log, accessory, device) {
         .setCharacteristic(Characteristic.Model, device.modelName)
         .setCharacteristic(Characteristic.SerialNumber, device.serialNumber)
         .setCharacteristic(Characteristic.FirmwareRevision, device.firmwareVersion);
+
+    this.accessory.on('identify', function(paired, callback) {
+        self.log("%s - identify", self.accessory.displayName);
+        callback();
+    });
 
     if (device.deviceType === Wemo.DEVICE_TYPE.Maker) {
         /* TODO: get initial state of WeMo Maker switch and sensor
@@ -520,6 +530,11 @@ function WemoLinkAccessory(log, accessory, link, device) {
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
         .setCharacteristic(Characteristic.SerialNumber, device.deviceId);
+
+    this.accessory.on('identify', function(paired, callback) {
+        self.log("%s - identify", self.accessory.displayName);
+        callback();
+    });
 
     // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
     this.getStatus(function (err) {
