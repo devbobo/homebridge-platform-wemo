@@ -14,8 +14,8 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 
 # Installation
 
-1. Install homebridge using: npm install -g homebridge
-2. Install this plugin using: npm install -g homebridge-platform-wemo
+1. Install homebridge using: `npm install -g homebridge`
+2. Install this plugin using: `npm install -g homebridge-platform-wemo`
 3. Update your configuration file. See the sample below.
 
 # Updating
