@@ -550,12 +550,12 @@ function WemoLinkAccessory(log, accessory, link, device) {
     });
 }
 
-WemoAccessory.prototype.getStatus = function (cb) {
+WemoLinkAccessory.prototype.getStatus = function (cb) {
     // this function is called on initialisation of a Bulbs because we can't rely on Belkin's
     // capabilities structure on initialisation so we'll explicity retrieve it here.
     var self = this;
 
-    this.client.getDeviceStatus(this.enddevice.deviceId, function (err, capabilities) {
+    this.client.getDeviceStatus(this.device.deviceId, function (err, capabilities) {
         if(err) {
             if(cb) {cb("unknown error getting device status (getStatus)", capabilities)}
         }
@@ -588,11 +588,11 @@ WemoLinkAccessory.prototype.setBrightness = function (value, cb) {
 }
 
 WemoLinkAccessory.prototype.setOnStatus = function (value, cb) {
-    debug("this.Onstate currently %s, value is %s", this.onState, value );
+    this.log("this.Onstate currently %s, value is %s", this.onState, value );
 
     if(this.onState !== value) { // if we have nothing to do so lets leave it at that.
         this.onState = value;
-        debug("this.Onstate now: %s", this.onState);
+        this.log("this.Onstate now: %s", this.onState);
         this.log("setOnStatus: %s to %s", this.accessory.displayName, value > 0 ? "on" : "off");
         this.client.setDeviceStatus(this.device.deviceId, 10006, (value ? 1 : 0));
     }
