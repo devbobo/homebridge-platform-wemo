@@ -18,6 +18,7 @@
 var Accessory, Characteristic, PowerConsumption, Service, uuid;
 var Wemo = require('wemo-client');
 var wemo = new Wemo();
+wemo.shouldEmitErrors = false;
 var debug = require('debug')('homebridge-platform-wemo');
 
 var noMotionTimer;
