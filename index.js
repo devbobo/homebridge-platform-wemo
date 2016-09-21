@@ -51,10 +51,10 @@ function WemoPlatform(log, config) {
     this.expectedAccessories = parseInt(config.expected_accessories) || 0; // default to false if not specficied
     this.timeout = config.timeout || 10; // default to 10 seconds if not specified
     this.homekitSafe = (isNaN(parseInt(config.homekit_safe, 10)) ) ? true : parseInt(config.homekit_safe, 10) > 0 ? true : false;
-        
+
     // if we have been not been told how many accessories to find then homekit safe is off.
     if(!this.expectedAccessories) { this.homekitSafe = false; }
-    
+
     noMotionTimer = config.no_motion_timer || 60;
 }
 
@@ -99,7 +99,7 @@ WemoPlatform.prototype = {
                 }
         });
 
-        // we'll wait here for the accessories to be found unless the specified number of 
+        // we'll wait here for the accessories to be found unless the specified number of
         // accessories has already been found in which case the timeout is cancelled!!
 
         var timer = setTimeout(function () {
@@ -197,9 +197,9 @@ function WemoAccessory(log, device, enddevice) {
 
 WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) {
     /*
-         We recieve this notification if the wemo's are changed by Homekit (i.e us) or 
+         We recieve this notification if the wemo's are changed by Homekit (i.e us) or
          some other trigger (i.e. any of the pethora of wemo apps).
-         We want to update homekit with these changes, 
+         We want to update homekit with these changes,
          to do that we need to use setValue which triggers another call back to here which
          we need to ignore - much of this function deals with the idiosyncrasies around this issue.
     */
@@ -208,9 +208,9 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
         this.log('statusChange Ignored (device): ', this.enddevice.deviceId, deviceId, capabilityId, value);
         return;
         }
-    
+
     if (this._capabilities[capabilityId] === value) {
-        // nothing's changed - lets get out of here to stop an endless loop as 
+        // nothing's changed - lets get out of here to stop an endless loop as
         // this callback was probably triggered by us updating HomeKit
         this.log('statusChange Ignored (capability): ', deviceId, capabilityId, value);
         return;
@@ -220,36 +220,36 @@ WemoAccessory.prototype._statusChange = function(deviceId, capabilityId, value) 
 
     // update our internal array with newly passed value.
     this._capabilities[capabilityId] = value;
-    
+
     switch(capabilityId) {
         case '10008': // this is a brightness change
             // update our convenience variable ASAP to minimise race condition possibiities
             var newbrightness = Math.round(this._capabilities['10008'].split(':').shift() / 255 * 100 );
- 
+
             // changing wemo bulb brightness always turns them on so lets reflect this locally and in homekit.
             // do we really need this or do we get both status change messages from wemo?
             if (!this.onState){ // if off
 //                 this.onState = true; // change convenience variable to on and call homekit which will trigger another ignored statusChange
                 this.log('Update homekit onState: %s is %s', this.name, true);
-                this._capabilities['10006'] = '1'; 
+                this._capabilities['10006'] = '1';
                 this.service.getCharacteristic(Characteristic.On).setValue(true);
                 }
-            
+
             // call setValue to update HomeKit and iOS (this generates another statusChange that will get ignored)
             this.log('Update homekit brightness: %s is %s', this.name, newbrightness);
             this.service.getCharacteristic(Characteristic.Brightness).setValue(newbrightness);
 
 
             break;
-            
+
         case '10006': // on/off/etc
             // reflect change of onState from potentially and external change (from Wemo App for instance)
             var newState = (this._capabilities['10006'].substr(0,1) === '1') ? true : false;
-            // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore    
+            // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore
             this.log('Update homekit onState: %s is %s', this.name, newState);
             this.service.getCharacteristic(Characteristic.On).setValue(newState);
             break;
-            
+
         default:
             console.log("This capability (%s) not implemented", capabilityId);
     }
@@ -328,7 +328,7 @@ WemoAccessory.prototype.setOn = function (value, cb) {
 //         this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
         this._client.setBinaryState(value ? 1 : 0, function (err){
             if(!err) {
-                this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");                
+                this.log("setOn: %s to %s", this.name, value > 0 ? "on" : "off");
                 this.onState = value;
                 if (cb) cb(null);
             } else {
@@ -387,7 +387,7 @@ WemoAccessory.prototype.setOnStatus = function (value, cb) {
         this._client.setDeviceStatus(this.enddevice.deviceId, 10006, (value ? 1 : 0));
     }
     if (cb) cb(null);
-    
+
 }
 
 WemoAccessory.prototype.getOnStatus = function (cb) {
