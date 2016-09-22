@@ -18,7 +18,6 @@
 var Accessory, Characteristic, PowerConsumption, Service, uuid;
 var Wemo = require('wemo-client');
 var wemo = new Wemo();
-wemo.shouldEmitErrors = false;
 var debug = require('debug')('homebridge-platform-wemo');
 
 var noMotionTimer;
@@ -190,6 +189,10 @@ function WemoAccessory(log, device, enddevice) {
                     self._onState = self.onState;
                 }
             }
+        }.bind(this));
+
+        this._client.on('error', function(error) {
+          self.log('error: ' + error);
         }.bind(this));
 
         if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
