@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "request": "^2.65.0",
-    "wemo-client": "git@github.com:joein3d/wemo-client.git",
+    "wemo-client": ">=0.11.0",
     "debug": "*"
   }
 }

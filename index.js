@@ -191,8 +191,16 @@ function WemoAccessory(log, device, enddevice) {
             }
         }.bind(this));
 
-        this._client.on('error', function(error) {
-          self.log('error: ' + error);
+        this._client.on('error', function(err) {
+          var timeout = 5; // seconds before we retry
+          self.log('HTTP Error (%s) occurred (re)subscribing to Wemo Device (%s %s), retrying.',
+            err.code, self.name, self.id);
+          if (err.code === 'ECONNREFUSED') { // try the alternate port that wemo tends to use.
+            (self.port === '49154') ? self.port = '49153' : self.port = '49154' ;
+            self.log('Trying port: %s', self.port);
+            timeout = 1; // may as well try the new port sooner than later
+          }
+          setTimeout(this._subscribe.bind(this), timeout * 1000, serviceType);
         }.bind(this));
 
         if(device.deviceType === Wemo.DEVICE_TYPE.Insight) {
