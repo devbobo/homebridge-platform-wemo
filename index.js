@@ -64,7 +64,8 @@ WemoPlatform.prototype = {
             this.expectedAccessories ? this.expectedAccessories : "an unknown number" , this.timeout);
         var foundAccessories = [];
         var self = this;
-        wemo.discover(function (device) {
+
+		function foundDevice(device)  {
             self.log("Found: %s, type: %s", device.friendlyName, device.deviceType.split(":")[3]);
             if (device.deviceType === Wemo.DEVICE_TYPE.Bridge) { // a wemolink bridge - find bulbs
                 var client = this.client(device , self.log);
@@ -97,7 +98,19 @@ WemoPlatform.prototype = {
                     callback(foundAccessories);
                     }
                 }
-        });
+        }
+
+        wemo.discover(foundDevice);
+
+
+
+		// Repeat discovery as some devices may appear late
+		setInterval(function() {
+			if (foundAccessories.length !== self.expectedAccessories) {
+				wemo.discover(foundDevice);
+			}
+		}, self.timeout * 250);
+
 
         // we'll wait here for the accessories to be found unless the specified number of
         // accessories has already been found in which case the timeout is cancelled!!
