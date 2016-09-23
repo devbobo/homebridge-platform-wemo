@@ -265,6 +265,10 @@ function WemoAccessory(log, accessory, device) {
     this.onState = false;
     this.service = this.getService();
 
+    this.client.on('error', function(err) {
+        self.log('%s reported error %s', self.accessory.displayName, err.code);
+    });
+
     this.updateReachability(true);
 
     this.accessory.getService(Service.AccessoryInformation)
@@ -525,6 +529,10 @@ function WemoLinkAccessory(log, accessory, link, device) {
     this.onState = false;
     this.brightness = null;
 
+    this.client.on('error', function(err) {
+        self.log('%s reported error %s', self.accessory.displayName, err.code);
+    });
+
     this.updateReachability(true);
 
     this.accessory.getService(Service.AccessoryInformation)
@@ -547,10 +555,6 @@ function WemoLinkAccessory(log, accessory, link, device) {
     // register eventhandler
     this.client.on('statusChange', function(deviceId, capabilityId, value) {
         self.statusChange(deviceId, capabilityId, value);
-    });
-
-    this.client.on('error', function(err) {
-        self.log('%s reported error %s', self.accessory.displayName, err.code);
     });
 }
 
