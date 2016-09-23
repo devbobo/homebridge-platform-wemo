@@ -17,6 +17,7 @@
   "dependencies": {
     "request": "^2.65.0",
     "wemo-client": ">=0.11.0",
-    "debug": "*"
+    "debug": "*",
+    "node-persist": "*"
   }
 }
