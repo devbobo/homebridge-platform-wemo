@@ -6,7 +6,6 @@
 //      {
 //          "platform": "BelkinWeMo",
 //          "name": "Belkin WeMo",
-//          "timeout": "" //defaults to 10 seconds that we look for accessories.
 //          "no_motion_timer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
 //      }
 // ],
@@ -533,8 +532,8 @@ WemoAccessory.prototype.updateReachability = function(reachable) {
             this.updateEventHandlers(Characteristic.On);
             this.updateEventHandlers(Characteristic.ContactSensorState);
             break;
+        case Wemo.DEVICE_TYPE.LightSwitch:
         case Wemo.DEVICE_TYPE.Switch:
-        case "urn:Belkin:device:lightswitch:1":
             this.updateEventHandlers(Characteristic.On);
             break;
         case Wemo.DEVICE_TYPE.Motion:

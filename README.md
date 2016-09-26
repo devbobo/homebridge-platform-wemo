@@ -7,7 +7,7 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 ## Currently supports
 - Wemo Switch
 - Wemo Light Switch 
-- Wemo Insight Switch (on/off/outlineinuse only)
+- Wemo Insight Switch (on/off/in use only)
 - Wemo Bulb (via Wemo Link - on/off/brightness)
 - Wemo Motion
 - Wemo NetCam (Sensor)
@@ -28,16 +28,13 @@ Recently refactored to increase speed of operation and update on/off/brightness 
 
 Configuration sample:
 
-`timeout` is **optional**, defaults to 10 and if specified, in seconds, defines how long we will wait to try and find the specified number of `expected_accessories`
-
 `no_motion_timer` is optional, defaults to 60 and applies to WeMo Motion Only. It is a timer in seconds for how long after motion is not detected that the state is changed.
 
  ```javascript
-"platforms": [
+    "platforms": [
         {
           "platform": "BelkinWeMo",
           "name": "WeMo Platform",
-          "timeout" : 25,
           "no_motion_timer": 60
         }   
     ]
