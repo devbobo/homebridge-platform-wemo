@@ -132,7 +132,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
     }
 
     var accessory = new Accessory(device.friendlyName, UUIDGen.generate(device.UDN));
-    var service = accessory.addService(serviceType);
+    var service = accessory.addService(serviceType, device.friendlyName);
 
     switch(device.deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
@@ -153,7 +153,7 @@ WemoPlatform.prototype.addLinkAccessory = function(link, device) {
     this.log("Found: %s [%s]", device.friendlyName, device.deviceId);
 
     var accessory = new Accessory(device.friendlyName, UUIDGen.generate(device.deviceId));
-    accessory.addService(Service.Lightbulb).addCharacteristic(Characteristic.Brightness);
+    accessory.addService(Service.Lightbulb, device.friendlyName).addCharacteristic(Characteristic.Brightness);
 
     this.accessories[accessory.UUID] = new WemoLinkAccessory(this.log, accessory, link, device);
     this.api.registerPlatformAccessories("homebridge-platform-wemo", "BelkinWeMo", [accessory]);
@@ -268,6 +268,16 @@ function WemoAccessory(log, accessory, device) {
         self.log("%s - identify", self.accessory.displayName);
         callback();
     });
+
+    var service = this.accessory.getService(getServiceType(device.deviceType));
+
+    if (service.testCharacteristic(Characteristic.Name) === false) {
+        service.addCharacteristic(Characteristic.Name);
+    }
+
+    if (service.getCharacteristic(Characteristic.Name).value === undefined) {
+        service.getCharacteristic(Characteristic.Name).setValue(device.friendlyName);
+    }
 
     this.observeDevice(device);
 }
@@ -571,6 +581,16 @@ function WemoLinkAccessory(log, accessory, link, device) {
         callback();
     });
 
+    var service = this.accessory.getService(Service.Lightbulb);
+
+    if (service.testCharacteristic(Characteristic.Name) === false) {
+        service.addCharacteristic(Characteristic.Name);
+    }
+
+    if (service.getCharacteristic(Characteristic.Name).value === undefined) {
+        service.getCharacteristic(Characteristic.Name).setValue(device.friendlyName);
+    }
+
     // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
     this.getStatus(function (err) {
         self.onState = (self.device.capabilities['10006'].substr(0,1) === '1') ? true : false ;
@@ -732,9 +752,9 @@ function getServiceType(deviceType) {
 
     switch(deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
+        case Wemo.DEVICE_TYPE.LightSwitch:
         case Wemo.DEVICE_TYPE.Maker:
         case Wemo.DEVICE_TYPE.Switch:
-        case "urn:Belkin:device:lightswitch:1":
             service = Service.Switch;
             break;
         case Wemo.DEVICE_TYPE.Motion:
