@@ -316,32 +316,32 @@ WemoAccessory.prototype.observeDevice = function (device) {
             }
         });
 
-      this.client.on('attributeList', function(name, value, prevalue, timestamp) {
-          switch(name) {
-              case 'Switch':
-                  self.onState = value > 0;
+        this.client.on('attributeList', function(name, value, prevalue, timestamp) {
+            switch(name) {
+                case 'Switch':
+                    self.onState = value > 0;
 
-                  if (self.service) {
-                      if (self.onState !== self._onState) {
-                          self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
-                      }
+                    if (self.service) {
+                        if (self.onState !== self._onState) {
+                            self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
+                        }
 
-                      self._onState = self.onState;
-                  }
-                  break;
-              case 'Sensor':
-                  self.onSensor = value > 0 ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
+                        self._onState = self.onState;
+                    }
+                    break;
+                case 'Sensor':
+                    self.onSensor = value > 0 ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
 
-                  if (self.service) {
-                      if (self.onSensor !== self._onSensor) {
-                          self.service.getCharacteristic(Characteristic.ContactSensorState).setValue(self.onSensor);
-                      }
+                    if (self.service) {
+                        if (self.onSensor !== self._onSensor) {
+                            self.service.getCharacteristic(Characteristic.ContactSensorState).setValue(self.onSensor);
+                        }
 
-                      self._onSensor = self.onSensor;
-                  }
-                  break;
-          }
-      }.bind(this));
+                        self._onSensor = self.onSensor;
+                    }
+                    break;
+            }
+        }.bind(this));
     }
     else {
         this.client.on('binaryState', function(state) {
