@@ -115,8 +115,8 @@ function WemoPlatform(log, config, api) {
                 self.log("Online and can update device: %s [%s]", accessory.displayName, device.macAddress);
                 accessory.setupDevice(device);
                 accessory.observeDevice(device);
-			}
-			else {
+            }
+            else {
                 self.log("Online: %s [%s]", accessory.displayName, device.macAddress);
                self.accessories[uuid] = new WemoAccessory(self.log, accessory, device);
             }
