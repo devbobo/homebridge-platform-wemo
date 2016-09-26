@@ -6,26 +6,24 @@
 //      {
 //          "platform": "BelkinWeMo",
 //          "name": "Belkin WeMo",
-//          "expected_accessories": "", stop looking for wemo accessories after this many found (excluding Wemo Link(s))
 //          "timeout": "" //defaults to 10 seconds that we look for accessories.
 //          "no_motion_timer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
-//          "homekit_safe" : "1" // optional: determines if we protect your homekit config if we can't find the expected number of accessories.
 //      }
 // ],
 
 "use strict";
 
+var Wemo  = require('wemo-client'),
+    debug = require('debug')('homebridge-platform-wemo');
+
 var Accessory, Characteristic, Consumption, Service, TotalConsumption, UUIDGen;
-var Wemo = require('wemo-client');
 var wemo = new Wemo();
-var http = require('http');
-//var debug = require('debug')('homebridge-platform-wemo');
 
 var noMotionTimer;
 
 module.exports = function (homebridge) {
     Accessory = homebridge.platformAccessory;
-    //Characteristic = homebridge.hap.Characteristic;
+    Characteristic = homebridge.hap.Characteristic;
     Service = homebridge.hap.Service;
     UUIDGen = homebridge.hap.uuid;
 
@@ -72,16 +70,6 @@ function WemoPlatform(log, config, api) {
     this.log = log;
 
     noMotionTimer = this.config.no_motion_timer || 60;
-
-    this.requestServer = http.createServer();
-
-    this.requestServer.on('error', function(err) {
-
-    });
-
-    this.requestServer.listen(18093, function() {
-        self.log("Server Listening...");
-    });
 
     var addDiscoveredDevice = function(device) {
         var uuid = UUIDGen.generate(device.UDN);
@@ -429,14 +417,14 @@ WemoAccessory.prototype.setOn = function (value, cb) {
 }
 
 WemoAccessory.prototype.setupDevice = function(device) {
-  var self = this;
-  this.device = device;
-  this.client = wemo.client(device);
-  this.onState = false;
+    var self = this;
+    this.device = device;
+    this.client = wemo.client(device);
+    this.onState = false;
 
-  this.client.on('error', function(err) {
-      self.log('%s reported error %s', self.accessory.displayName, err.code);
-  });
+    this.client.on('error', function(err) {
+        self.log('%s reported error %s', self.accessory.displayName, err.code);
+    });
 }
 
 WemoAccessory.prototype.updateEventHandlers= function (characteristic) {
