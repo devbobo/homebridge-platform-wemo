@@ -37,8 +37,8 @@ Configuration sample:
         {
           "platform": "BelkinWeMo",
           "name": "WeMo Platform",
-          "timeout" : "25",
-          "no_motion_timer": "60"
+          "timeout" : 25,
+          "no_motion_timer": 60
         }   
     ]
 
