@@ -9,6 +9,7 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 - Wemo Light Switch 
 - Wemo Insight Switch (on/off/in use only)
 - Wemo Bulb (via Wemo Link - on/off/brightness)
+- Wemo Maker
 - Wemo Motion
 - Wemo NetCam (Sensor)
 
