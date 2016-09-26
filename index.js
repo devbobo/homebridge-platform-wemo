@@ -25,7 +25,7 @@ var noMotionTimer;
 
 module.exports = function (homebridge) {
     Accessory = homebridge.platformAccessory;
-    Characteristic = homebridge.hap.Characteristic;
+    //Characteristic = homebridge.hap.Characteristic;
     Service = homebridge.hap.Service;
     UUIDGen = homebridge.hap.uuid;
 
@@ -296,16 +296,40 @@ WemoAccessory.prototype.getService = function() {
 }
 
 WemoAccessory.prototype.observeDevice = function (device) {
-  var self = this;
-  if (device.deviceType === Wemo.DEVICE_TYPE.Maker) {
-      /* TODO: get initial state of WeMo Maker switch and sensor
-      submitted a request for this method to be added to wemo-client
-      https://github.com/timonreinhard/wemo-client/issues/24
-      this.client.getAttributeList(function() {
-      });
-      */
+    var self = this;
 
-      this.client.on('attributeList', function(name, value, prevalue, timestamp){
+    if (device.deviceType === Wemo.DEVICE_TYPE.Maker) {
+        this.client.getAttributes(function(err, attributes) {
+            if (err) {
+                return;
+            }
+
+            var value = parseInt(attributes.Switch);
+
+            self.onState = value > 0;
+
+            if (self.service) {
+                if (self.onState !== self._onState) {
+                    self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
+                }
+
+                self._onState = self.onState;
+            }
+
+            value = parseInt(attributes.Sensor);
+
+            self.onSensor = value > 0 ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
+
+            if (self.service) {
+                if (self.onSensor !== self._onSensor) {
+                    self.service.getCharacteristic(Characteristic.ContactSensorState).setValue(self.onSensor);
+                }
+
+                self._onSensor = self.onSensor;
+            }
+        });
+
+      this.client.on('attributeList', function(name, value, prevalue, timestamp) {
           switch(name) {
               case 'Switch':
                   self.onState = value > 0;
@@ -331,51 +355,51 @@ WemoAccessory.prototype.observeDevice = function (device) {
                   break;
           }
       }.bind(this));
-  }
-  else {
-      this.client.on('binaryState', function(state) {
-          self.onState = state > 0;
+    }
+    else {
+        this.client.on('binaryState', function(state) {
+            self.onState = state > 0;
 
-          if (self.service) {
-              if (self.onState !== self._onState) {
-                  if (self.device.deviceType === Wemo.DEVICE_TYPE.Motion || self.device.deviceType === "urn:Belkin:device:NetCamSensor:1") {
-                      self.updateMotionDetected();
-                  }
-                  else {
-                      self.log('%s binaryState: %s', self.accessory.displayName, self.onState ? "on" : "off");
-                      self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
+            if (self.service) {
+                if (self.onState !== self._onState) {
+                    if (self.device.deviceType === Wemo.DEVICE_TYPE.Motion || self.device.deviceType === "urn:Belkin:device:NetCamSensor:1") {
+                        self.updateMotionDetected();
+                    }
+                    else {
+                        self.log('%s binaryState: %s', self.accessory.displayName, self.onState ? "on" : "off");
+                        self.service.getCharacteristic(Characteristic.On).setValue(self.onState);
 
-                      if(self.onState === false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
-                          self.inUse = false;
-                          self.updateInUse();
+                        if(self.onState === false && self.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+                            self.inUse = false;
+                            self.updateInUse();
 
-                          self.powerUsage = 0;
-                          self.updatePowerUsage();
-                      }
-                  }
-              }
+                            self.powerUsage = 0;
+                            self.updatePowerUsage();
+                        }
+                    }
+                }
 
-              self._onState = self.onState;
-          }
-      }.bind(this));
-  }
+                self._onState = self.onState;
+            }
+        }.bind(this));
+    }
 
-  if (device.deviceType === Wemo.DEVICE_TYPE.Insight) {
-      this.client.on('insightParams', function(state, power, data){
-          self.inUse = (state == 1);
-          self.powerUsage = Math.round(power / 1000);
+    if (device.deviceType === Wemo.DEVICE_TYPE.Insight) {
+        this.client.on('insightParams', function(state, power, data){
+            self.inUse = (state == 1);
+            self.powerUsage = Math.round(power / 1000);
 
-          // not currently returned by wemo-client
-          if (data.TodayConsumed !== undefined) {
-              self.totalUsage = Math.round(data.TodayConsumed / 10000 * 6) / 100;
-          }
+            // not currently returned by wemo-client
+            if (data.TodayConsumed !== undefined) {
+                self.totalUsage = Math.round(data.TodayConsumed / 10000 * 6) / 100;
+            }
 
-          if (self.service) {
-              self.updateInUse();
-              self.updatePowerUsage();
-          }
-      }.bind(this));
-  }
+            if (self.service) {
+                self.updateInUse();
+                self.updatePowerUsage();
+            }
+        }.bind(this));
+    }
 }
 
 WemoAccessory.prototype.setOn = function (value, cb) {
