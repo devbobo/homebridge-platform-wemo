@@ -111,11 +111,12 @@ function WemoPlatform(log, config, api) {
             if (accessory === undefined) {
                 self.addAccessory(device);
             }
-            else if (accessory.setupDevice !== undefined) {
+            else if (accessory instanceof WemoAccessory) {
                 self.log("Online and can update device: %s [%s]", accessory.displayName, device.macAddress);
                 accessory.setupDevice(device);
                 accessory.observeDevice(device);
-			} else {
+			}
+			else {
                 self.log("Online: %s [%s]", accessory.displayName, device.macAddress);
                self.accessories[uuid] = new WemoAccessory(self.log, accessory, device);
             }
@@ -294,17 +295,6 @@ WemoAccessory.prototype.getService = function() {
     return this.accessory.getService(service);
 }
 
-WemoAccessory.prototype.setupDevice = function(device) {
-  var self = this;
-  this.device = device;
-  this.client = wemo.client(device);
-  this.onState = false;
-
-  this.client.on('error', function(err) {
-      self.log('%s reported error %s', self.accessory.displayName, err.code);
-  });
-}
-
 WemoAccessory.prototype.observeDevice = function (device) {
   var self = this;
   if (device.deviceType === Wemo.DEVICE_TYPE.Maker) {
@@ -388,7 +378,6 @@ WemoAccessory.prototype.observeDevice = function (device) {
   }
 }
 
-
 WemoAccessory.prototype.setOn = function (value, cb) {
     if (this.onState !== value) {  //remove redundent calls to setBinaryState when requested state is already achieved
         //this.log("setOn: %s to %s", this.accessory.displayName, value > 0 ? "on" : "off");
@@ -413,6 +402,17 @@ WemoAccessory.prototype.setOn = function (value, cb) {
             cb(null);
         }
     }
+}
+
+WemoAccessory.prototype.setupDevice = function(device) {
+  var self = this;
+  this.device = device;
+  this.client = wemo.client(device);
+  this.onState = false;
+
+  this.client.on('error', function(err) {
+      self.log('%s reported error %s', self.accessory.displayName, err.code);
+  });
 }
 
 WemoAccessory.prototype.updateEventHandlers= function (characteristic) {
