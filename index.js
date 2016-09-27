@@ -762,7 +762,7 @@ function getServiceType(deviceType) {
             service = Service.MotionSensor;
             break;
         default:
-            this.log("Not Supported");
+            this.log("Not Supported: %s", deviceType);
     }
 
     return service;
