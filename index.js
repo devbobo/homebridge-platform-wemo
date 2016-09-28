@@ -631,18 +631,18 @@ WemoLinkAccessory.prototype.getStatus = function (cb) {
 }
 
 WemoLinkAccessory.prototype.setBrightness = function (value, cb) {
-  this._brightness = value;
+    this._brightness = value;
 
-  //defer the actual update by 0.1 seconds to smooth out changes from sliders
-  setTimeout(function(brightness, caller){
-    //check that we actually have a change to make and that something
-    //hasn't tried to update the brightness again in the last 0.1 seconds
-    if(caller.brightness !== brightness && caller._brightness == brightness) {
-      caller.client.setDeviceStatus(caller.device.deviceId, 10008, brightness*255/100 );
-      caller.log("setBrightness: %s to %s%%", caller.accessory.displayName, brightness);
-      caller.brightness = brightness;
-    }
-  },100,value,this);
+    //defer the actual update by 100 milliseconds to smooth out changes from sliders
+    setTimeout(function(brightness, caller) {
+        //check that we actually have a change to make and that something
+        //hasn't tried to update the brightness again in the last 100 milliseconds
+        if(caller.brightness !== brightness && caller._brightness == brightness) {
+            caller.client.setDeviceStatus(caller.device.deviceId, 10008, brightness*255/100 );
+            caller.log("setBrightness: %s to %s%%", caller.accessory.displayName, brightness);
+            caller.brightness = brightness;
+        }
+    }, 100, value, this);
 
     if (cb) {
         cb(null);
