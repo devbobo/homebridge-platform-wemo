@@ -14,7 +14,6 @@
 
 var Wemo  = require('wemo-client'),
     debug = require('debug')('homebridge-platform-wemo');
-    var nextBrightness = {};
 
 var Accessory, Characteristic, Consumption, Service, TotalConsumption, UUIDGen;
 var wemo = new Wemo();
@@ -632,19 +631,18 @@ WemoLinkAccessory.prototype.getStatus = function (cb) {
 }
 
 WemoLinkAccessory.prototype.setBrightness = function (value, cb) {
-  nextBrightness[this.accessory.displayName] = value; //record the next brightness so we can compare it later
+  this._brightness = value;
 
   //defer the actual update by 0.1 seconds to smooth out changes from sliders
   setTimeout(function(brightness, caller){
     //check that we actually have a change to make and that something
-    //hasn't tried to update the brightness again in the last 01 seconds
-    if(caller.brightness !== brightness && nextBrightness[caller.accessory.displayName] == brightness) {
-      caller.client.setDeviceStatus(caller.device.deviceId, 10008, value*255/100 );
-      caller.log("setBrightness: %s to %s%%", caller.accessory.displayName, value);
-      caller.brightness = value;
+    //hasn't tried to update the brightness again in the last 0.1 seconds
+    if(caller.brightness !== brightness && caller._brightness == brightness) {
+      caller.client.setDeviceStatus(caller.device.deviceId, 10008, brightness*255/100 );
+      caller.log("setBrightness: %s to %s%%", caller.accessory.displayName, brightness);
+      caller.brightness = brightness;
     }
   },100,value,this);
-
 
     if (cb) {
         cb(null);
