@@ -86,7 +86,6 @@ function WemoPlatform(log, config, api) {
                         self.addLinkAccessory(device, enddevices[i]);
                     }
                     else {
-                        self.log("Online: %s [%s]", accessory.displayName, device.deviceId);
                         self.accessories[uuid] = new WemoLinkAccessory(self.log, accessory, device, enddevices[i]);
                     }
                 }
@@ -118,7 +117,7 @@ function WemoPlatform(log, config, api) {
         function(){
             wemo.discover(addDiscoveredDevice);
         },
-        60000
+        30000
     );
 }
 
@@ -141,7 +140,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
             service.addCharacteristic(TotalConsumption);
             break;
         case Wemo.DEVICE_TYPE.Maker:
-            service.addCharacteristic(Characteristic.ContactSensorState);
+            //service.addCharacteristic(Characteristic.ContactSensorState);
             break;
     }
 
@@ -202,8 +201,11 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                 callback(respDict, "platform", true, this.config);
             }
             break;
+        case "DoModify":
+            break;
         case "Menu":
-            context.onScreen = "Remove";
+        	context.onScreen = "Remove";
+            //context.onScreen = request && request.response && request.response.selections[0] == 1 ? "Remove" : "Modify";
         case "Remove":
             respDict = {
                 "type": "Interface",
@@ -228,6 +230,7 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                     "title": "Select option",
                     "allowMultipleSelection": false,
                     "items": ["Remove Accessory"]
+                    //"items": ["Modify Accessory", "Remove Accessory"]
                 }
 
                 context.onScreen = "Menu";
@@ -235,7 +238,6 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
             }
     }
 }
-
 
 WemoPlatform.prototype.removeAccessory = function(accessory) {
     this.log("Remove: %s", accessory.displayName);
@@ -285,12 +287,32 @@ WemoAccessory.prototype.getAttributes = function(callback) {
 
     this.client.getAttributes(function(err, attributes) {
         if (err) {
+            this.log(err);
             callback();
             return;
         }
 
+        this.device.attributes = attributes;
+
+        if (attributes.SensorPresent == 1) {
+            if (this.accessory.getService(Service.Switch) !== undefined) {
+                 if (this.accessory.getService(Service.ContactSensor) === undefined) {
+                     this.log("%s - Add Service: %s", this.accessory.displayName, "Service.ContactSensor");
+                     this.accessory.addService(Service.ContactSensor, this.accessory.displayName);
+                 }
+
+                 this.updateSensorState(attributes.Sensor);
+            }
+        }
+        else {
+	        var contactSensor = this.accessory.getService(Service.ContactSensor);
+            if (contactSensor !== undefined) {
+                this.log("%s - Remove Service: %s", this.accessory.displayName, "Service.ContactSensor");
+                this.accessory.removeService(contactSensor);
+            }
+        }
+
         this.updateSwitchState(attributes.Switch);
-        this.updateSensorState(attributes.Sensor);
 
         callback();
     }.bind(this));
@@ -324,7 +346,7 @@ WemoAccessory.prototype.getService = function() {
     return this.accessory.getService(service);
 }
 
-WemoAccessory.prototype.observeDevice = function (device) {
+WemoAccessory.prototype.observeDevice = function(device) {
     if (device.deviceType === Wemo.DEVICE_TYPE.Maker) {
         this.getAttributes();
 
@@ -355,16 +377,15 @@ WemoAccessory.prototype.observeDevice = function (device) {
     }
 }
 
-WemoAccessory.prototype.setSwitchState = function (state, callback) {
-    var value = state > 0;
+WemoAccessory.prototype.setSwitchState = function(state, callback) {
+    var value = state | 0;
     var switchState = this.service.getCharacteristic(Characteristic.On);
     callback = callback || function() {};
 
     if (switchState.value != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
-        this.client.setBinaryState(value | 0, function (err) {
+        this.client.setBinaryState(value, function (err) {
             if(!err) {
-                this.log("%s - Set state: %s", this.accessory.displayName, (value ? "on" : "off"));
-                //this.onState = value;
+                this.log("%s - Set state: %s", this.accessory.displayName, (value ? "On" : "Off"));
                 callback(null);
             }
             else {
@@ -398,7 +419,7 @@ WemoAccessory.prototype.updateConsumption = function(raw) {
     return value;
 }
 
-WemoAccessory.prototype.updateEventHandlers= function(characteristic) {
+WemoAccessory.prototype.updateEventHandlers = function(characteristic) {
     if (this.service === undefined) {
         return;
     }
@@ -430,7 +451,9 @@ WemoAccessory.prototype.updateInsightParams = function(state, power, data) {
 }
 
 WemoAccessory.prototype.updateOutletInUse = function(state) {
-    var value = state == 1;
+    state = state | 0;
+
+    var value = !!state;
     var outletInUse = this.service.getCharacteristic(Characteristic.OutletInUse);
 
     if (outletInUse.value !== value) {
@@ -442,7 +465,9 @@ WemoAccessory.prototype.updateOutletInUse = function(state) {
 }
 
 WemoAccessory.prototype.updateMotionDetected = function(state) {
-    var value = state > 0;
+    state = state | 0;
+
+    var value = !!state;
     var motionDetected = this.service.getCharacteristic(Characteristic.MotionDetected);
 
     if (value === motionDetected.value || (value === false && this.motionTimer)) {
@@ -489,8 +514,16 @@ WemoAccessory.prototype.updateReachability = function(reachable) {
 }
 
 WemoAccessory.prototype.updateSensorState = function(state) {
-    var value = !(state > 0);
-    var sensorState = this.service.getCharacteristic(Characteristic.ContactSensorState);
+    state = state | 0;
+
+    var value = !state;
+    var service = this.accessory.getService(Service.ContactSensor);
+
+    if (service === undefined) {
+        return;
+    }
+
+    var sensorState = service.getCharacteristic(Characteristic.ContactSensorState);
 
     if (sensorState.value !== value) {
         this.log("%s - Sensor: %s", this.accessory.displayName, (value ? "Detected" : "Not detected"));
@@ -501,12 +534,16 @@ WemoAccessory.prototype.updateSensorState = function(state) {
 }
 
 WemoAccessory.prototype.updateSwitchState = function(state) {
-    var value = state > 0;
+    state = state | 0;
+
+    var value = !!state;
     var switchState = this.service.getCharacteristic(Characteristic.On)
 
     if (switchState.value !== value) {
         this.log("%s - Get state: %s", this.accessory.displayName, (value ? "On" : "Off"));
+        switchState.removeAllListeners();
         switchState.setValue(value);
+        this.updateEventHandlers(Characteristic.On);
 
         if(value === false && this.device.deviceType === Wemo.DEVICE_TYPE.Insight) {
             this.updateOutletInUse(0);
@@ -537,23 +574,59 @@ function WemoLinkAccessory(log, accessory, link, device) {
     this.device = device;
     this.log = log;
     this.client = wemo.client(link, log);
-    this.onState = false;
-    this.brightness = null;
 
     this.client.on('error', function(err) {
-        self.log('%s reported error %s', self.accessory.displayName, err.code);
-    });
+        this.log('%s reported error %s', this.accessory.displayName, err.code);
+    }.bind(this));
 
-    this.updateReachability(true);
+    this.updateReachability(false);
 
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
+        .setCharacteristic(Characteristic.Model, "Dimmable Bulb")
         .setCharacteristic(Characteristic.SerialNumber, device.deviceId);
 
     this.accessory.on('identify', function(paired, callback) {
-        self.log("%s - identify", self.accessory.displayName);
-        callback();
-    });
+        this.log("%s - Identify", this.accessory.displayName);
+
+        var switchState = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On);
+        var count = 0;
+
+        if (switchState.value == true) {
+            setOff();
+        }
+        else {
+            setOn();
+        }
+
+        function setOn() {
+            switchState.setValue(true);
+            count++;
+
+            if (count == 6) {
+                callback();
+                return;
+            }
+
+            setTimeout(function() {
+                setOff();
+            }, 500);
+        }
+
+        function setOff() {
+            switchState.setValue(false);
+            count++;
+
+            if (count == 6) {
+                callback();
+                return;
+            }
+
+            setTimeout(function() {
+                setOn();
+            }, 750);
+        }
+    }.bind(this));
 
     var service = this.accessory.getService(Service.Lightbulb);
 
@@ -565,137 +638,119 @@ function WemoLinkAccessory(log, accessory, link, device) {
         service.getCharacteristic(Characteristic.Name).setValue(device.friendlyName);
     }
 
-    // we can't depend on the capabilities returned from Belkin so we'll go ask expliciitly.
-    this.getStatus(function (err) {
-        self.onState = (self.device.capabilities[WemoLinkAccessory.OPTIONS.Switch].substr(0,1) === '1') ? true : false ;
-        self.log("%s (bulb) reported as %s", self.accessory.displayName, self.onState ? "on" : "off");
-        self.brightness = Math.round(self.device.capabilities[WemoLinkAccessory.OPTIONS.Brightness].split(':').shift() * 100 / 255 );
-        self.log("%s (bulb) reported as at %s%% brightness", self.accessory.displayName, self.brightness);
-    });
+    this.getSwitchState();
 
     // register eventhandler
     this.client.on('statusChange', function(deviceId, capabilityId, value) {
-        self.statusChange(deviceId, capabilityId, value);
-    });
+        if (this.device.deviceId !== deviceId){
+            return;
+        }
+
+        this.statusChange(deviceId, capabilityId, value);
+    }.bind(this));
 }
 
 WemoLinkAccessory.OPTIONS = {
     Brightness: '10008',
-    Color:      '10300',
     Switch:     '10006'
 }
 
-WemoLinkAccessory.prototype.getStatus = function (callback) {
-    // this function is called on initialisation of a Bulbs because we can't rely on Belkin's
-    // capabilities structure on initialisation so we'll explicity retrieve it here.
+WemoLinkAccessory.prototype.getSwitchState = function(callback) {
     callback = callback || function() {};
 
-    this.client.getDeviceStatus(this.device.deviceId, function (err, capabilities) {
+    this.client.getDeviceStatus(this.device.deviceId, function(err, capabilities) {
         if(err) {
-            callback("unknown error getting device status (getStatus)", capabilities);
+            callback(null);
             return;
         }
 
         if (!capabilities[WemoLinkAccessory.OPTIONS.Switch].length) { // we've get no data in the capabilities array, so it's off
-            this.log("%s appears to be off, i.e. at the power!", this.name);
-        }
-        else {
-            //this.log("getStatus: %s is ", this.name, capabilities);
-            this._capabilities = capabilities;
+            this.log("Offline: %s [%s]", this.accessory.displayName, this.device.deviceId);
+            this.updateReachability(false);
+            callback(null);
+            return;
         }
 
-        callback(null)
+        this.log("Online: %s [%s]", this.accessory.displayName, this.device.deviceId);
+
+        var value = this.updateSwitchState(capabilities[WemoLinkAccessory.OPTIONS.Switch]);
+        this.updateBrightness(capabilities[WemoLinkAccessory.OPTIONS.Brightness]);
+        this.updateReachability(true);
+        callback(null, value);
     }.bind(this));
 }
 
-WemoLinkAccessory.prototype.setBrightness = function (value, callback) {
-    this._brightness = value;
+WemoLinkAccessory.prototype.setBrightness = function(value, callback) {
+    var brightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
     callback = callback || function() {};
 
-    //defer the actual update by 100 milliseconds to smooth out changes from sliders
-    setTimeout(function(brightness, caller) {
-        //check that we actually have a change to make and that something
-        //hasn't tried to update the brightness again in the last 100 milliseconds
-        if(caller.brightness !== brightness && caller._brightness == brightness) {
-            caller.client.setDeviceStatus(caller.device.deviceId, WemoLinkAccessory.OPTIONS.Brightness, brightness * 255 / 100);
-            caller.log("setBrightness: %s to %s%%", caller.accessory.displayName, brightness);
-            caller.brightness = brightness;
-        }
-    }, 100, value, this);
+    if (brightness.value == value) {
+        callback(null);
+        return;
+    }
 
-    callback(null);
+    this.log("%s - Set brightness: %s%", this.accessory.displayName, value);
+    this.client.setDeviceStatus(this.device.deviceId, WemoLinkAccessory.OPTIONS.Brightness, value * 255 / 100, function(err, response) {
+        this.setSwitchState(true);
+        callback(null);
+    }.bind(this));
 }
 
-WemoLinkAccessory.prototype.setOnStatus = function (value, callback) {
-    this.log("this.Onstate currently %s, value is %s", this.onState, value );
+WemoLinkAccessory.prototype.setSwitchState = function(state, callback) {
+    var value = state | 0;
+    var switchState = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On);
     callback = callback || function() {};
 
-    if(this.onState !== value) { // if we have nothing to do so lets leave it at that.
-        this.onState = value;
-        this.log("this.Onstate now: %s", this.onState);
-        this.log("setOnStatus: %s to %s", this.accessory.displayName, value > 0 ? "on" : "off");
-        this.client.setDeviceStatus(this.device.deviceId, WemoLinkAccessory.OPTIONS.Switch, value | 0, function(err, response) {
-            callback(null);
-        });
+    if(switchState.value == value) {
+        callback(null);
+        return;
     }
+
+    this.log("%s - Set state: %s", this.accessory.displayName, (value ? "On" : "Off"));
+    this.client.setDeviceStatus(this.device.deviceId, WemoLinkAccessory.OPTIONS.Switch, value, function(err, response) {
+        this.device.capabilities[WemoLinkAccessory.OPTIONS.Switch] = value;
+        callback(null);
+    }.bind(this));
 }
 
 WemoLinkAccessory.prototype.statusChange = function(deviceId, capabilityId, value) {
-        // We receive this notification if the wemo's are changed by Homekit (i.e us) or
-        // some other trigger (i.e. any of the pethora of wemo apps).
-        // We want to update homekit with these changes,
-        // to do that we need to use setValue which triggers another call back to here which
-        // we need to ignore - much of this function deals with the idiosyncrasies around this issue.
+    if (this.accessory.reachable === false) {
+        this.updateReachability(true);
+    }
 
-    if (this.device.deviceId !== deviceId){
-        // we get called for every bulb on the link so lets get out of here if the call is for a differnt bulb
-        this.log('statusChange Ignored (device): ', this.device.deviceId, deviceId, capabilityId, value);
+    if (this.device.capabilities[capabilityId] == value) {
         return;
     }
 
-    if (this.device.capabilities[capabilityId] === value) {
-        // nothing's changed - lets get out of here to stop an endless loop as
-        // this callback was probably triggered by us updating HomeKit
-        this.log('statusChange Ignored (capability): ', deviceId, capabilityId, value);
-        return;
-    }
-
-    this.log('statusChange processing: ', deviceId, capabilityId, value);
-
-    // update our internal array with newly passed value.
     this.device.capabilities[capabilityId] = value;
 
     switch(capabilityId) {
-        case WemoLinkAccessory.OPTIONS.Brightness: // this is a brightness change
-            // update our convenience variable ASAP to minimise race condition possibiities
-            var newbrightness = Math.round(this.device.capabilities[WemoLinkAccessory.OPTIONS.Brightness].split(':').shift() * 100 / 255 );
-
-            // changing wemo bulb brightness always turns them on so lets reflect this locally and in homekit.
-            // do we really need this or do we get both status change messages from wemo?
-            if (!this.onState){ // if off
-                this.log('Update homekit onState: %s is %s', this.accessory.displayName, true);
-                this.device.capabilities[WemoLinkAccessory.OPTIONS.Switch] = '1';
-                this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).setValue(true);
-            }
-
-            // call setValue to update HomeKit and iOS (this generates another statusChange that will get ignored)
-            this.log('Update homekit brightness: %s is %s', this.accessory.displayName, newbrightness);
-            this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness).setValue(newbrightness);
+        case WemoLinkAccessory.OPTIONS.Brightness:
+            this.updateBrightness(value);
             break;
-        case WemoLinkAccessory.OPTIONS.Switch: // on/off/etc
-            // reflect change of onState from potentially and external change (from Wemo App for instance)
-            var newState = (this.device.capabilities[WemoLinkAccessory.OPTIONS.Switch].substr(0,1) === '1') ? true : false;
-            // similarly we need to update iOS with this change - which will trigger another state shange which we'll ignore
-            this.log('Update homekit onState: %s is %s', this.accessory.displayName, newState);
-            this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On).setValue(newState);
+        case WemoLinkAccessory.OPTIONS.Switch:
+            this.updateSwitchState(value);
             break;
         default:
-            console.log("This capability (%s) not implemented", capabilityId);
+            this.log("This capability (%s) not implemented", capabilityId);
     }
 }
 
-WemoLinkAccessory.prototype.updateEventHandlers= function (characteristic) {
-    var self = this;
+WemoLinkAccessory.prototype.updateBrightness = function(capability) {
+    var value = Math.round(capability.split(':').shift() * 100 / 255 );
+    var brightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
+
+    if (brightness.value != value) {
+        this.log("%s - Get brightness: %s%", this.accessory.displayName, value);
+        brightness.removeAllListeners();
+        brightness.setValue(value);
+        this.updateEventHandlers(Characteristic.Brightness);
+    }
+
+    return value;
+}
+
+WemoLinkAccessory.prototype.updateEventHandlers = function(characteristic) {
     var service = this.accessory.getService(Service.Lightbulb)
 
     if (service.testCharacteristic(characteristic) === false) {
@@ -712,14 +767,13 @@ WemoLinkAccessory.prototype.updateEventHandlers= function (characteristic) {
         case Characteristic.On:
             service
                 .getCharacteristic(Characteristic.On)
-                .on('set', this.setOnStatus.bind(this))
-                .on('get', function(callback) {callback(null, self.onState)});
+                .on('get', this.getSwitchState.bind(this))
+                .on('set', this.setSwitchState.bind(this));
             break;
         case Characteristic.Brightness:
             service
                 .getCharacteristic(Characteristic.Brightness)
-                .on('set', this.setBrightness.bind(this))
-                .on('get', function(callback) {callback(null, self.brightness)});
+                .on('set', this.setBrightness.bind(this));
             break;
     }
 }
@@ -728,6 +782,22 @@ WemoLinkAccessory.prototype.updateReachability = function(reachable) {
     this.accessory.updateReachability(reachable);
     this.updateEventHandlers(Characteristic.On);
     this.updateEventHandlers(Characteristic.Brightness);
+}
+
+WemoLinkAccessory.prototype.updateSwitchState = function(state) {
+    state = state | 0;
+
+    var value = !!state;
+    var switchState = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.On);
+
+    if (switchState.value != value) {
+        this.log("%s - Get state: %s", this.accessory.displayName, (value ? "On" : "Off"));
+        switchState.removeAllListeners();
+        switchState.setValue(value);
+        this.updateEventHandlers(Characteristic.On);
+    }
+
+    return value;
 }
 
 function getServiceType(deviceType) {
