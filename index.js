@@ -69,7 +69,7 @@ function WemoPlatform(log, config, api) {
     this.accessories = {};
     this.log = log;
 
-    noMotionTimer = this.config.no_motion_timer || 60;
+    noMotionTimer = this.config.noMotionTimer || this.config.no_motion_timer || 60;
 
     var addDiscoveredDevice = function(device) {
         var uuid = UUIDGen.generate(device.UDN);
