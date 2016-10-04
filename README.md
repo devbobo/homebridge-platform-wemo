@@ -29,7 +29,9 @@ Recently refactored to increase speed of operation and update on/off/brightness 
 
 Configuration sample:
 
-`noMotionTimer` is optional, defaults to 60 and applies to WeMo Motion Only. It is a timer in seconds for how long after motion is not detected that the state is changed.
+`noMotionTimer` is optional, defaults to 60 and applies to WeMo Motion only. It is a timer in seconds for how long after motion is not detected that the state is changed.
+
+`doorOpenTimer` is optional, defaults to 15 and applies to WeMo Maker only (Garage Door Opener mode). The time in seconds for how long it takes the garage door to open. It is used to generate the `Open` state after the door has been requested to `Open`, due to only having one input. If `Sensor` is set to `No` in the WeMo app, the time is also used to generate the `Closed` state (**Not Recommended**)
 
 `ignoredDevices` is optional. Expects an array of serial numbers, any devices found with matching serial numbers will be skipped or removed from Homebridge
 

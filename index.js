@@ -12,13 +12,16 @@
 
 "use strict";
 
+const DEFAULT_DOOR_OPEN_TIME = 15,
+      DEFAULT_NO_MOTION_TIME  = 60;
+
 var Wemo  = require('wemo-client'),
     debug = require('debug')('homebridge-platform-wemo');
 
 var Accessory, Characteristic, Consumption, Service, TotalConsumption, UUIDGen;
 var wemo = new Wemo();
 
-var noMotionTimer;
+var doorOpenTimer, noMotionTimer;
 
 module.exports = function (homebridge) {
     Accessory = homebridge.platformAccessory;
@@ -69,7 +72,8 @@ function WemoPlatform(log, config, api) {
     this.accessories = {};
     this.log = log;
 
-    noMotionTimer = this.config.noMotionTimer || this.config.no_motion_timer || 60;
+    doorOpenTimer = this.config.doorOpenTimer || DEFAULT_DOOR_OPEN_TIME;
+    noMotionTimer = this.config.noMotionTimer || this.config.no_motion_timer || DEFAULT_NO_MOTION_TIME;
 
     var addDiscoveredDevice = function(device) {
         var uuid = UUIDGen.generate(device.UDN);
@@ -530,7 +534,7 @@ WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTrigger
         }
 
         self.updateCurrentDoorState(Characteristic.CurrentDoorState.OPEN);
-    }, 15000, this);
+    }, doorOpenTimer * 1000, this);
 }
 
 WemoAccessory.prototype.setSwitchState = function(state, callback) {
