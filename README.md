@@ -30,6 +30,7 @@ Recently refactored to increase speed of operation and update on/off/brightness 
 Configuration sample:
 
 `noMotionTimer` is optional, defaults to 60 and applies to WeMo Motion Only. It is a timer in seconds for how long after motion is not detected that the state is changed.
+
 `ignoredDevices` is optional. Expects an array of serial numbers, any devices found with matching serial numbers will be skipped or removed from Homebridge
 
  ```javascript
