@@ -12,7 +12,7 @@
 
 "use strict";
 
-const DEFAULT_DOOR_OPEN_TIME = 15,
+const DEFAULT_DOOR_OPEN_TIME = 20,
       DEFAULT_NO_MOTION_TIME  = 60;
 
 var Wemo  = require('wemo-client'),
@@ -455,7 +455,7 @@ WemoAccessory.prototype.observeDevice = function(device) {
                     }
                     break;
                 case 'Sensor':
-                    this.updateSensorState(value);
+                    this.updateSensorState(value, true);
                     break;
             }
         }.bind(this));
@@ -486,8 +486,6 @@ WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTrigger
 
     if (this.isMoving === true) {
         delete this.isMoving;
-
-        console.log(targetDoorState);
         this.updateCurrentDoorState(Characteristic.CurrentDoorState.STOPPED);
 
         // Toggle TargetDoorState after receiving a stop
@@ -525,15 +523,12 @@ WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTrigger
 
         var targetDoorState = self.accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.TargetDoorState);
 
-        if (targetDoorState.value == Characteristic.TargetDoorState.CLOSED) {
-            if (this.sensorPresent !== true) {
-                self.updateCurrentDoorState(Characteristic.CurrentDoorState.CLOSED);
-            }
-
+        if (self.sensorPresent !== true) {
+            self.updateCurrentDoorState(targetDoorState.value ? Characteristic.CurrentDoorState.CLOSED : Characteristic.CurrentDoorState.OPEN);
             return;
         }
 
-        self.updateCurrentDoorState(Characteristic.CurrentDoorState.OPEN);
+        self.getAttributes();
     }, doorOpenTimer * 1000, this);
 }
 
@@ -700,7 +695,7 @@ WemoAccessory.prototype.updateCurrentDoorState = function(value, actualFeedback)
         .updateValue(value);
 }
 
-WemoAccessory.prototype.updateSensorState = function(state) {
+WemoAccessory.prototype.updateSensorState = function(state, wasTriggered) {
     state = state | 0;
 
     var value = !state;
@@ -729,7 +724,7 @@ WemoAccessory.prototype.updateSensorState = function(state) {
             // Garage door's target state is OPEN, but the garage door's current state is CLOSED,
             // it must have been triggered externally by a remote control
             else if (value == Characteristic.CurrentDoorState.CLOSED) {
-                this.log("%s - Set Target Door State: Closed (triggered by External)");
+                this.log("%s - Set Target Door State: Closed (triggered by External)", this.accessory.displayName);
                 delete this.isMoving;
                 targetDoorState.updateValue(Characteristic.TargetDoorState.CLOSED);
                 this.updateCurrentDoorState(Characteristic.CurrentDoorState.CLOSED, true);
@@ -739,14 +734,23 @@ WemoAccessory.prototype.updateSensorState = function(state) {
             // Garage door's target state is CLOSED and the garage door's current state is CLOSED
             if (value == Characteristic.CurrentDoorState.CLOSED) {
                 delete this.isMoving;
+
+                if (this.movingTimer) {
+                    clearTimeout(this.movingTimer);
+                    delete this.movingTimer;
+                }
+
                 this.updateCurrentDoorState(Characteristic.CurrentDoorState.CLOSED, true);
             }
             // Garage door's target state is CLOSED, but the garage door's current state is OPEN,
             // it must have been triggered externally by a remote control
             else if (value == Characteristic.CurrentDoorState.OPEN) {
-                this.log("%s - Set Target Door State: Open (triggered by External)");
+                this.log("%s - Set Target Door State: Open (triggered by External)", this.accessory.displayName);
                 targetDoorState.updateValue(Characteristic.TargetDoorState.OPEN);
-                this.setDoorMoving(Characteristic.TargetDoorState.OPEN);
+
+                if (wasTriggered === true) {
+                    this.setDoorMoving(Characteristic.TargetDoorState.OPEN);
+                }
             }
         }
     }
