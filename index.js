@@ -141,7 +141,7 @@ function WemoPlatform(log, config, api) {
 WemoPlatform.prototype.addAccessory = function(device) {
     var serviceType;
 
-    switch(deviceType) {
+    switch(device.deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
         case Wemo.DEVICE_TYPE.LightSwitch:
         case Wemo.DEVICE_TYPE.Switch:
@@ -299,6 +299,39 @@ function WemoAccessory(log, accessory, device) {
     });
 
     this.observeDevice(device);
+    this.addEventHandlers();
+}
+
+
+WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) {
+    serviceName = serviceName || Service.Switch;
+
+    var service = this.accessory.getService(serviceName);
+
+    if (service === undefined) {
+        return;
+    }
+
+    if (service.testCharacteristic(characteristic) === false) {
+        return;
+    }
+
+    switch(characteristic) {
+        case Characteristic.On:
+            service
+                .getCharacteristic(characteristic)
+                .on('set', this.setSwitchState.bind(this));
+            break;
+        case Characteristic.TargetDoorState:
+            service
+                .getCharacteristic(characteristic)
+                .on('set', this.setTargetDoorState.bind(this));
+    }
+}
+
+WemoAccessory.prototype.addEventHandlers = function() {
+    this.addEventHandler(Service.Switch, Characteristic.On);
+    this.addEventHandler(Service.GarageDoorOpener, Characteristic.TargetDoorState);
 }
 
 WemoAccessory.prototype.getAttributes = function(callback) {
@@ -317,7 +350,7 @@ WemoAccessory.prototype.getAttributes = function(callback) {
         if (attributes.SwitchMode == 1) {
             if (this.accessory.getService(Service.GarageDoorOpener) === undefined) {
                 this.accessory.addService(Service.GarageDoorOpener, this.accessory.displayName);
-                this.updateEventHandlers(Service.GarageDoorOpener, Characteristic.TargetDoorState);
+                this.addEventHandler(Service.GarageDoorOpener, Characteristic.TargetDoorState);
             }
 
             if (this.accessory.getService(Service.Switch) !== undefined) {
@@ -332,7 +365,7 @@ WemoAccessory.prototype.getAttributes = function(callback) {
         else if (attributes.SwitchMode == 0) {
             if (this.accessory.getService(Service.Switch) === undefined) {
                 this.accessory.addService(Service.Switch, this.accessory.displayName);
-                this.updateEventHandlers(Service.Switch, Characteristic.On);
+                this.addEventHandler(Service.Switch, Characteristic.On);
             }
 
             if (this.accessory.getService(Service.GarageDoorOpener) !== undefined) {
@@ -440,8 +473,6 @@ WemoAccessory.prototype.observeDevice = function(device) {
 }
 
 WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTriggered) {
-    this.log("setDoorMoving: ", targetDoorState, homekitTriggered, this.isMoving);
-
     var service = this.accessory.getService(Service.GarageDoorOpener);
 
     if (this.movingTimer) {
@@ -577,40 +608,6 @@ WemoAccessory.prototype.updateConsumption = function(raw) {
     return value;
 }
 
-WemoAccessory.prototype.updateEventHandlers = function(serviceName, characteristic) {
-    serviceName = serviceName || Service.Switch;
-
-    var service = this.accessory.getService(serviceName);
-
-    if (service === undefined) {
-        return;
-    }
-
-    if (service.testCharacteristic(characteristic) === false) {
-        return;
-    }
-
-    service.getCharacteristic(characteristic).removeAllListeners();
-
-    if (this.accessory.reachable !== true) {
-        return;
-    }
-
-    var self = this;
-
-    switch(characteristic) {
-        case Characteristic.On:
-            service
-                .getCharacteristic(characteristic)
-                .on('set', this.setSwitchState.bind(this));
-            break;
-        case Characteristic.TargetDoorState:
-            service
-                .getCharacteristic(characteristic)
-                .on('set', this.setTargetDoorState.bind(this));
-    }
-}
-
 WemoAccessory.prototype.updateInsightParams = function(state, power, data) {
     this.updateSwitchState(state);
     this.updateOutletInUse(state);
@@ -665,22 +662,6 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
 
 WemoAccessory.prototype.updateReachability = function(reachable) {
     this.accessory.updateReachability(reachable);
-
-    switch(this.device.deviceType) {
-        case Wemo.DEVICE_TYPE.Insight:
-        case Wemo.DEVICE_TYPE.LightSwitch:
-        case Wemo.DEVICE_TYPE.Switch:
-            this.updateEventHandlers(Service.Switch, Characteristic.On);
-            break;
-        case Wemo.DEVICE_TYPE.Maker:
-            this.updateEventHandlers(Service.Switch, Characteristic.On);
-            this.updateEventHandlers(Service.GarageDoorOpener, Characteristic.TargetDoorState);
-        case Wemo.DEVICE_TYPE.Motion:
-        case "urn:Belkin:device:NetCamSensor:1":
-            break;
-        default:
-            console.log("Not implemented");
-    }
 }
 
 WemoAccessory.prototype.updateCurrentDoorState = function(value, actualFeedback) {
@@ -862,16 +843,7 @@ function WemoLinkAccessory(log, accessory, link, device) {
         }
     }.bind(this));
 
-    var service = this.accessory.getService(Service.Lightbulb);
-
-    if (service.testCharacteristic(Characteristic.Name) === false) {
-        service.addCharacteristic(Characteristic.Name);
-    }
-
-    if (service.getCharacteristic(Characteristic.Name).value === undefined) {
-        service.getCharacteristic(Characteristic.Name).setValue(device.friendlyName);
-    }
-
+    this.addEventHandlers();
     this.getSwitchState();
 
     // register eventhandler
@@ -887,6 +859,32 @@ function WemoLinkAccessory(log, accessory, link, device) {
 WemoLinkAccessory.OPTIONS = {
     Brightness: '10008',
     Switch:     '10006'
+}
+
+WemoLinkAccessory.prototype.addEventHandler = function(characteristic) {
+    var service = this.accessory.getService(Service.Lightbulb)
+
+    if (service.testCharacteristic(characteristic) === false) {
+        return;
+    }
+
+    switch(characteristic) {
+        case Characteristic.On:
+            service
+                .getCharacteristic(Characteristic.On)
+                .on('set', this.setSwitchState.bind(this));
+            break;
+        case Characteristic.Brightness:
+            service
+                .getCharacteristic(Characteristic.Brightness)
+                .on('set', this.setBrightness.bind(this));
+            break;
+    }
+}
+
+WemoLinkAccessory.prototype.addEventHandlers = function () {
+    this.addEventHandler(Characteristic.On);
+    this.addEventHandler(Characteristic.Brightness);
 }
 
 WemoLinkAccessory.prototype.getSwitchState = function(callback) {
@@ -982,37 +980,8 @@ WemoLinkAccessory.prototype.updateBrightness = function(capability) {
     return value;
 }
 
-WemoLinkAccessory.prototype.updateEventHandlers = function(characteristic) {
-    var service = this.accessory.getService(Service.Lightbulb)
-
-    if (service.testCharacteristic(characteristic) === false) {
-        return;
-    }
-
-    service.getCharacteristic(characteristic).removeAllListeners();
-
-    if (this.accessory.reachable !== true) {
-        return;
-    }
-
-    switch(characteristic) {
-        case Characteristic.On:
-            service
-                .getCharacteristic(Characteristic.On)
-                .on('set', this.setSwitchState.bind(this));
-            break;
-        case Characteristic.Brightness:
-            service
-                .getCharacteristic(Characteristic.Brightness)
-                .on('set', this.setBrightness.bind(this));
-            break;
-    }
-}
-
 WemoLinkAccessory.prototype.updateReachability = function(reachable) {
     this.accessory.updateReachability(reachable);
-    this.updateEventHandlers(Characteristic.On);
-    this.updateEventHandlers(Characteristic.Brightness);
 }
 
 WemoLinkAccessory.prototype.updateSwitchState = function(state) {
