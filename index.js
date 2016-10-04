@@ -159,7 +159,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
             serviceType = Service.Switch;
             break;
         default:
-            this.log("Not Supported: %s [%s]", device.friendlyName, deviceType);
+            this.log("Not Supported: %s [%s]", device.friendlyName, device.deviceType);
     }
 
     if (serviceType === undefined) {
