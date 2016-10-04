@@ -921,19 +921,28 @@ WemoLinkAccessory.prototype.getSwitchState = function(callback) {
 }
 
 WemoLinkAccessory.prototype.setBrightness = function(value, callback) {
-    var brightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
     callback = callback || function() {};
 
-    if (brightness.value == value) {
+    if (this.brightness == value) {
         callback(null);
         return;
     }
 
-    this.log("%s - Set brightness: %s%", this.accessory.displayName, value);
-    this.client.setDeviceStatus(this.device.deviceId, WemoLinkAccessory.OPTIONS.Brightness, value * 255 / 100, function(err, response) {
-        this.setSwitchState(true);
-        callback(null);
-    }.bind(this));
+    this._brightness = value;
+
+    //defer the actual update to smooth out changes from sliders
+    setTimeout(function(caller, value) {
+        //check that we actually have a change to make and that something
+        //hasn't tried to update the brightness again in the last 0.1 seconds
+        if (caller.brightness !== value && caller._brightness == value) {
+            caller.client.setDeviceStatus(caller.device.deviceId, 10008, value * 255 / 100, function(err, response) {
+                caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
+                caller.brightness = brightness;
+            }.bind(caller));
+        }
+    }, 100, this, value);
+
+    callback(null);
 }
 
 WemoLinkAccessory.prototype.setSwitchState = function(state, callback) {
@@ -983,6 +992,7 @@ WemoLinkAccessory.prototype.updateBrightness = function(capability) {
     if (brightness.value != value) {
         this.log("%s - Get brightness: %s%", this.accessory.displayName, value);
         brightness.updateValue(value);
+        this.brightness = value;
     }
 
     return value;
