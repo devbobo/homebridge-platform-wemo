@@ -13,7 +13,7 @@
 "use strict";
 
 const DEFAULT_DOOR_OPEN_TIME = 20,
-      DEFAULT_NO_MOTION_TIME  = 60;
+      DEFAULT_NO_MOTION_TIME = 60;
 
 var Wemo  = require('wemo-client'),
     debug = require('debug')('homebridge-platform-wemo');
