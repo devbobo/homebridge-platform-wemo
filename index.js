@@ -937,7 +937,7 @@ WemoLinkAccessory.prototype.setBrightness = function(value, callback) {
         if (caller.brightness !== value && caller._brightness == value) {
             caller.client.setDeviceStatus(caller.device.deviceId, 10008, value * 255 / 100, function(err, response) {
                 caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
-                caller.brightness = brightness;
+                caller.brightness = value;
             }.bind(caller));
         }
     }, 100, this, value);
