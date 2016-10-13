@@ -634,7 +634,7 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
     var value = !!state;
     var motionDetected = this.accessory.getService(Service.MotionSensor).getCharacteristic(Characteristic.MotionDetected);
 
-    if (value === motionDetected.value || (value === false && this.motionTimer)) {
+    if ((value === motionDetected.value && this.motionTimer === undefined) || (value === false && this.motionTimer)) {
         return;
     }
 
@@ -642,7 +642,7 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
         if (this.motionTimer) {
             this.log("%s - no motion timer stopped", this.accessory.displayName);
             clearTimeout(this.motionTimer);
-            this.motionTimer = null;
+            delete this.motionTimer;
         }
 
         this.log("%s - Motion Sensor: %s", this.accessory.displayName, (value ? "Detected" : "Clear"));
@@ -654,7 +654,7 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
         this.motionTimer = setTimeout(function(self) {
             self.log("%s - Motion Sensor: Clear; no motion timer completed", self.accessory.displayName);
             self.accessory.getService(Service.MotionSensor).getCharacteristic(Characteristic.MotionDetected).setValue(false);
-            self.motionTimer = null;
+            delete self.motionTimer;
         }, noMotionTimer * 1000, this);
     }
 }
