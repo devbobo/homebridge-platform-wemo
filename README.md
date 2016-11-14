@@ -1,6 +1,8 @@
 # homebridge-platform-wemo
 [![NPM Version](https://img.shields.io/npm/v/homebridge-platform-wemo.svg)](https://www.npmjs.com/package/homebridge-platform-wemo)
 [![Code Climate](https://codeclimate.com/github/rudders/homebridge-platform-wemo/badges/gpa.svg)](https://codeclimate.com/github/rudders/homebridge-platform-wemo)
+[![Dependency Status](https://img.shields.io/versioneye/d/nodejs/homebridge-platform-wemo.svg)](https://www.versioneye.com/nodejs/homebridge-platform-wemo/)
+
 
 Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfarina/homebridge) project.
 
