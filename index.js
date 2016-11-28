@@ -64,6 +64,11 @@ module.exports = function (homebridge) {
 
 function WemoPlatform(log, config, api) {
     this.config = config || {};
+
+    if (this.config.ignoredDevices && this.config.ignoredDevices.constructor !== Array) {
+        delete this.config.ignoredDevices;
+    }
+
     this.ignoredDevices = this.config.ignoredDevices || [];
 
     var self = this;
@@ -904,7 +909,7 @@ WemoLinkAccessory.prototype.getSwitchState = function(callback) {
             return;
         }
 
-        if (!capabilities[WemoLinkAccessory.OPTIONS.Switch].length) { // we've get no data in the capabilities array, so it's off
+        if (capabilities[WemoLinkAccessory.OPTIONS.Switch] === undefined || !capabilities[WemoLinkAccessory.OPTIONS.Switch].length) { // we've get no data in the capabilities array, so it's off
             this.log("Offline: %s [%s]", this.accessory.displayName, this.device.deviceId);
             this.updateReachability(false);
             callback(null);
