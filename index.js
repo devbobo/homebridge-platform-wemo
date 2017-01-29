@@ -576,10 +576,17 @@ WemoAccessory.prototype.setTargetDoorState = function(state, callback) {
 
     var currentDoorState = this.accessory.getService(Service.GarageDoorOpener).getCharacteristic(Characteristic.CurrentDoorState);
 
-    if (this.isMoving !== true && value == Characteristic.TargetDoorState.CLOSED && currentDoorState.value == Characteristic.CurrentDoorState.CLOSED) {
-        this.log("Door already closed");
-        callback(null);
-        return;
+    if (this.isMoving !== true) {
+        if (value == Characteristic.TargetDoorState.CLOSED && currentDoorState.value == Characteristic.CurrentDoorState.CLOSED) {
+            this.log("Door already closed");
+            callback(null);
+            return;
+        }
+        else if (value == Characteristic.TargetDoorState.OPEN && currentDoorState.value == Characteristic.CurrentDoorState.OPEN) {
+            this.log("Door already open");
+            callback(null);
+            return;
+        }
     }
 
     this.client.setBinaryState(1, function (err) {
