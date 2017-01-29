@@ -152,8 +152,10 @@ WemoPlatform.prototype.addAccessory = function(device) {
 
     switch(device.deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
-        case Wemo.DEVICE_TYPE.LightSwitch:
         case Wemo.DEVICE_TYPE.Switch:
+            serviceType = Service.Outlet;
+            break;
+        case Wemo.DEVICE_TYPE.LightSwitch:
             serviceType = Service.Switch;
             break;
         case Wemo.DEVICE_TYPE.Motion:
@@ -178,7 +180,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
 
     switch(device.deviceType) {
         case Wemo.DEVICE_TYPE.Insight:
-            service.addCharacteristic(Characteristic.OutletInUse);
+            //service.addCharacteristic(Characteristic.OutletInUse);
             service.addCharacteristic(Consumption);
             service.addCharacteristic(TotalConsumption);
             break;
@@ -318,6 +320,11 @@ WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) 
     var service = this.accessory.getService(serviceName);
 
     if (service === undefined) {
+        serviceName = Service.Outlet;
+        service = this.accessory.getService(serviceName);
+    }
+
+    if (service === undefined) {
         return;
     }
 
@@ -423,7 +430,8 @@ WemoAccessory.prototype.getSwitchState = function(callback) {
     else {
         this.client.getBinaryState(function(err, state) {
             if (err) {
-                callback(null, this.accessory.getService(Service.Switch).getCharacteristic(Characteristic.On).value);
+                var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+                callback(null, service.getCharacteristic(Characteristic.On).value);
                 return;
             }
 
@@ -539,7 +547,8 @@ WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTrigger
 
 WemoAccessory.prototype.setSwitchState = function(state, callback) {
     var value = state | 0;
-    var switchState = this.accessory.getService(Service.Switch).getCharacteristic(Characteristic.On);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var switchState = service.getCharacteristic(Characteristic.On);
     callback = callback || function() {};
 
     if (switchState.value != value) {  //remove redundent calls to setBinaryState when requested state is already achieved
@@ -602,7 +611,8 @@ WemoAccessory.prototype.setupDevice = function(device) {
 
 WemoAccessory.prototype.updateConsumption = function(raw) {
     var value = Math.round(raw / 1000);
-    var consumption = this.accessory.getService(Service.Switch).getCharacteristic(Consumption);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var consumption = service.getCharacteristic(Consumption);
 
     if (consumption.value !== value) {
         this.log("%s - Consumption: %sw", this.accessory.displayName, value);
@@ -623,7 +633,8 @@ WemoAccessory.prototype.updateOutletInUse = function(state) {
     state = state | 0;
 
     var value = !!state;
-    var outletInUse = this.accessory.getService(Service.Switch).getCharacteristic(Characteristic.OutletInUse);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var outletInUse = service.getCharacteristic(Characteristic.OutletInUse);
 
     if (outletInUse.value !== value) {
         this.log("%s - Outlet In Use: %s", this.accessory.displayName, (value ? "Yes" : "No"));
@@ -767,7 +778,8 @@ WemoAccessory.prototype.updateSwitchState = function(state) {
     state = state | 0;
 
     var value = !!state;
-    var switchState = this.accessory.getService(Service.Switch).getCharacteristic(Characteristic.On)
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var switchState = service.getCharacteristic(Characteristic.On);
 
     if (switchState.value !== value) {
         this.log("%s - Get state: %s", this.accessory.displayName, (value ? "On" : "Off"));
@@ -784,7 +796,8 @@ WemoAccessory.prototype.updateSwitchState = function(state) {
 
 WemoAccessory.prototype.updateTotalConsumption = function(raw) {
     var value = Math.round(raw / 10000 * 6) / 100;
-    var totalConsumption = this.accessory.getService(Service.Switch).getCharacteristic(TotalConsumption);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var totalConsumption = service.getCharacteristic(TotalConsumption);
 
     if (totalConsumption.value !== value) {
         this.log("%s - Total Consumption: %skwh", this.accessory.displayName, value);
