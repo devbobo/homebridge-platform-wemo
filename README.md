@@ -38,16 +38,24 @@ Configuration sample:
 
 `ignoredDevices` is optional. Expects an array of serial numbers, any devices found with matching serial numbers will be skipped or removed from Homebridge
 
+`wemoClient` is optional. Expects an object of initialisation parameters to be passed to wemo-client.
+
  ```javascript
     "platforms": [
         {
-          "platform": "BelkinWeMo",
-          "name": "WeMo Platform",
-          "noMotionTimer": 60,
-          "ignoredDevices": []
+            "platform": "BelkinWeMo",
+            "name": "WeMo Platform",
+            "noMotionTimer": 60,
+            "ignoredDevices": [],
+            "wemoClient": {         // this is an example, please don't copy and paste this.
+                port: 1234,
+                discover_opts: {
+                    unicastBindPort: 1235
+                },
+                listen_interface: 'wlan0'
+            }
         }   
     ]
-
 ```
 
 # Credits

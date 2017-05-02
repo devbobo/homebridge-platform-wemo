@@ -6,7 +6,9 @@
 //      {
 //          "platform": "BelkinWeMo",
 //          "name": "Belkin WeMo",
-//          "noMotionTimer": 60 // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
+//          "noMotionTimer": 60,  // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
+//          "ignoredDevices": [], // optional
+//          "wemoClient": {}      // optional: initialisation parameters to be passed to wemo-client
 //      }
 // ],
 
@@ -63,7 +65,15 @@ module.exports = function (homebridge) {
 };
 
 function WemoPlatform(log, config, api) {
-    this.config = config || {};
+    if (!config) {
+        log.warn("Ignoring WeMo Platform setup because it is not configured");
+        this.disabled = true;
+        return;
+    }
+
+    this.config = config;
+
+    wemo = new Wemo(this.config.wemoClient || {});
 
     if (this.config.ignoredDevices && this.config.ignoredDevices.constructor !== Array) {
         delete this.config.ignoredDevices;
