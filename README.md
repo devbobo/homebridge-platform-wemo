@@ -32,11 +32,26 @@ Recently refactored to increase speed of operation and update on/off/brightness 
 
 Configuration sample:
 
+ ```javascript
+    "platforms": [
+        {
+            "platform": "BelkinWeMo",
+            "name": "WeMo Platform"
+        }
+    ]
+```
+
+Optional parameters:
+
 `noMotionTimer` is optional, defaults to 60 and applies to WeMo Motion only. It is a timer in seconds for how long after motion is not detected that the state is changed.
 
 `doorOpenTimer` is optional, defaults to 15 and applies to WeMo Maker only (Garage Door Opener mode). The time in seconds for how long it takes the garage door to open. It is used to generate the `Open` state after the door has been requested to `Open`, due to only having one input. If `Sensor` is set to `No` in the WeMo app, the time is also used to generate the `Closed` state (**Not Recommended**)
 
 `ignoredDevices` is optional. Expects an array of serial numbers, any devices found with matching serial numbers will be skipped or removed from Homebridge
+
+`manualDevices` is optional. Expects an array of device setup urls (eg. "http://192.168.1.20:49153/setup.xml") to be configured manually outside the device discovery process
+
+`discovery` is optional, defaults to true. A way to disable device discovery if not required
 
 `wemoClient` is optional. Expects an object of initialisation parameters to be passed to wemo-client.
 
@@ -47,6 +62,8 @@ Configuration sample:
             "name": "WeMo Platform",
             "noMotionTimer": 60,
             "ignoredDevices": [],
+            "manualDevices": [],
+            "discovery": true,
             "wemoClient": {         // this is an example, please don't copy and paste this.
                 port: 1234,
                 discover_opts: {
@@ -54,7 +71,7 @@ Configuration sample:
                 },
                 listen_interface: 'wlan0'
             }
-        }   
+        }
     ]
 ```
 

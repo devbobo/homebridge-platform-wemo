@@ -7,7 +7,9 @@
 //          "platform": "BelkinWeMo",
 //          "name": "Belkin WeMo",
 //          "noMotionTimer": 60,  // optional: [WeMo Motion only] a timer (in seconds) which is started no motion is detected, defaults to 60
-//          "ignoredDevices": [], // optional
+//          "ignoredDevices": [], // optional: an array of Device serial numbers to ignore
+//          "manualDevices": [],  // optional: an array of config urls for devices to be manually configured eg. "manualDevices": ["http://192.168.1.20:49153/setup.xml"]
+//          "discovery": true,    // optional: turn off device discovery if not required
 //          "wemoClient": {}      // optional: initialisation parameters to be passed to wemo-client
 //      }
 // ],
@@ -79,7 +81,13 @@ function WemoPlatform(log, config, api) {
         delete this.config.ignoredDevices;
     }
 
+    if (this.config.manualDevices && this.config.manualDevices.constructor !== Array) {
+        delete this.config.manualDevices;
+    }
+
+    this.discovery = this.config.discovery || true;
     this.ignoredDevices = this.config.ignoredDevices || [];
+    this.manualDevices = this.config.manualDevices || [];
 
     var self = this;
 
@@ -146,15 +154,23 @@ function WemoPlatform(log, config, api) {
     }
 
     this.api.on('didFinishLaunching', function() {
-        wemo.discover(addDiscoveredDevice);
-    });
+        for (var i in this.manualDevices) {
+            wemo.load(this.manualDevices[i], addDiscoveredDevice);
+        }
 
-    setInterval(
-        function(){
+        if (this.discovery == true) {
             wemo.discover(addDiscoveredDevice);
-        },
-        30000
-    );
+        }
+    }.bind(this));
+
+    if (this.discovery == true) {
+        setInterval(
+            function(){
+                wemo.discover(addDiscoveredDevice);
+            },
+            30000
+        );
+    }
 }
 
 WemoPlatform.prototype.addAccessory = function(device) {
