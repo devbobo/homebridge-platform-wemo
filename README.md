@@ -1,6 +1,8 @@
 # homebridge-platform-wemo
+
+[![npm package](https://nodei.co/npm/homebridge-platform-wemo.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/homebridge-platform-wemo/)
+
 [![NPM Version](https://img.shields.io/npm/v/homebridge-platform-wemo.svg)](https://www.npmjs.com/package/homebridge-platform-wemo)
-[![Code Climate](https://codeclimate.com/github/rudders/homebridge-platform-wemo/badges/gpa.svg)](https://codeclimate.com/github/rudders/homebridge-platform-wemo)
 [![Dependency Status](https://img.shields.io/versioneye/d/nodejs/homebridge-platform-wemo.svg)](https://www.versioneye.com/nodejs/homebridge-platform-wemo/)
 [![Slack Channel](https://img.shields.io/badge/slack-homebridge--wemo-E01563.svg)](https://homebridgeteam.slack.com/messages/C0HSKCAR4/)
 
