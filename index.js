@@ -98,7 +98,7 @@ function WemoPlatform(log, config, api) {
     doorOpenTimer = this.config.doorOpenTimer || DEFAULT_DOOR_OPEN_TIME;
     noMotionTimer = this.config.noMotionTimer || this.config.no_motion_timer || DEFAULT_NO_MOTION_TIME;
 
-    var addDiscoveredDevice = function(device) {
+    var addDiscoveredDevice = function(err, device) {
         var uuid = UUIDGen.generate(device.UDN);
         var accessory;
 
