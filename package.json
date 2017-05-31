@@ -15,7 +15,7 @@
         "homebridge": ">=0.4.1"
     },
     "dependencies": {
-        "wemo-client": ">=0.12.0",
+        "wemo-client": ">=0.13.0",
         "debug": "*"
     }
 }
