@@ -185,7 +185,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
             serviceType = Service.Switch;
             break;
         case Wemo.DEVICE_TYPE.Dimmer:
-            serviceType = Service.Switch;
+            serviceType = Service.Dimmer;
             break;
         case Wemo.DEVICE_TYPE.Motion:
         case "urn:Belkin:device:NetCamSensor:1":
