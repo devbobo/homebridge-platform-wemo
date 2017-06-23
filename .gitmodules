@@ -1,3 +1,0 @@
-[submodule "node_modules/wemo-client"]
-	path = node_modules/wemo-client
-	url = https://github.com/timonreinhard/wemo-client.git
