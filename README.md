@@ -12,6 +12,7 @@ Belkin WeMo Platform plugin for the awesome  [Homebridge](https://github.com/nfa
 ## Currently supports
 - Wemo Switch
 - Wemo Light Switch 
+- Wemo Dimmer (As Light Switch, no dimming)
 - Wemo Insight Switch
 - Wemo Bulb (via Wemo Link - on/off/brightness)
 - Wemo Maker (as Garage Door Opener or Switch with Contact Sensor)
