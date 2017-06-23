@@ -8,14 +8,14 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git@github.com:markhatchell/homebridge-platform-wemo.git"
+        "url": "git://github.com/rudders/homebridge-platform-wemo.git"
     },
     "engines": {
         "node": ">=0.12.0",
         "homebridge": ">=0.4.1"
     },
     "dependencies": {
-        "wemo-client": "https://github.com/markhatchell/wemo-client.git#master",
+        "wemo-client": ">=0.13.0",
         "debug": "*"
     }
 }
