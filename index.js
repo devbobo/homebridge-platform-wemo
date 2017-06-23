@@ -181,6 +181,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
         case Wemo.DEVICE_TYPE.Switch:
             serviceType = Service.Outlet;
             break;
+        case Wemo.DEVICE_TYPE.Dimmer:
         case Wemo.DEVICE_TYPE.LightSwitch:
             serviceType = Service.Switch;
             break;
