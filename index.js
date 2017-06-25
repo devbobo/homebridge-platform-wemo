@@ -99,6 +99,10 @@ function WemoPlatform(log, config, api) {
     noMotionTimer = this.config.noMotionTimer || this.config.no_motion_timer || DEFAULT_NO_MOTION_TIME;
 
     var addDiscoveredDevice = function(err, device) {
+        if (!device) {
+            return;
+        }
+
         var uuid = UUIDGen.generate(device.UDN);
         var accessory;
 
@@ -338,7 +342,6 @@ function WemoAccessory(log, accessory, device) {
     this.observeDevice(device);
     this.addEventHandlers();
 }
-
 
 WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) {
     serviceName = serviceName || Service.Switch;
