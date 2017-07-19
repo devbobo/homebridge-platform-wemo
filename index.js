@@ -231,7 +231,6 @@ WemoPlatform.prototype.addLinkAccessory = function(link, device) {
 }
 
 WemoPlatform.prototype.configureAccessory = function(accessory) {
-    accessory.updateReachability(false);
     this.accessories[accessory.UUID] = accessory;
 }
 
@@ -326,7 +325,6 @@ function WemoAccessory(log, accessory, device) {
     this.log = log;
 
     this.setupDevice(device);
-    this.updateReachability(true);
 
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
@@ -711,10 +709,6 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
     }
 }
 
-WemoAccessory.prototype.updateReachability = function(reachable) {
-    this.accessory.updateReachability(reachable);
-}
-
 WemoAccessory.prototype.updateCurrentDoorState = function(value, actualFeedback) {
     var state;
 
@@ -856,8 +850,6 @@ function WemoLinkAccessory(log, accessory, link, device) {
         this.log('%s reported error %s', this.accessory.displayName, err.code);
     }.bind(this));
 
-    this.updateReachability(false);
-
     this.accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, "Belkin WeMo")
         .setCharacteristic(Characteristic.Model, "Dimmable Bulb")
@@ -960,7 +952,6 @@ WemoLinkAccessory.prototype.getSwitchState = function(callback) {
 
         if (capabilities[WemoLinkAccessory.OPTIONS.Switch] === undefined || !capabilities[WemoLinkAccessory.OPTIONS.Switch].length) { // we've get no data in the capabilities array, so it's off
             this.log("Offline: %s [%s]", this.accessory.displayName, this.device.deviceId);
-            this.updateReachability(false);
             callback(null);
             return;
         }
@@ -969,7 +960,6 @@ WemoLinkAccessory.prototype.getSwitchState = function(callback) {
 
         var value = this.updateSwitchState(capabilities[WemoLinkAccessory.OPTIONS.Switch]);
         this.updateBrightness(capabilities[WemoLinkAccessory.OPTIONS.Brightness]);
-        this.updateReachability(true);
         callback(null, value);
     }.bind(this));
 }
@@ -1017,10 +1007,6 @@ WemoLinkAccessory.prototype.setSwitchState = function(state, callback) {
 }
 
 WemoLinkAccessory.prototype.statusChange = function(deviceId, capabilityId, value) {
-    if (this.accessory.reachable === false) {
-        this.updateReachability(true);
-    }
-
     if (this.device.capabilities[capabilityId] == value) {
         return;
     }
@@ -1050,10 +1036,6 @@ WemoLinkAccessory.prototype.updateBrightness = function(capability) {
     }
 
     return value;
-}
-
-WemoLinkAccessory.prototype.updateReachability = function(reachable) {
-    this.accessory.updateReachability(reachable);
 }
 
 WemoLinkAccessory.prototype.updateSwitchState = function(state) {
