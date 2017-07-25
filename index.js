@@ -53,7 +53,7 @@ module.exports = function (homebridge) {
 
         this.setProps({
             format: Characteristic.Formats.UINT32,
-            unit: 'kWh',
+            unit: 'Wh',  // change from kWh to Wh to have value significance for low mW draw
             perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
         });
 
@@ -662,7 +662,7 @@ WemoAccessory.prototype.updateInsightParams = function(state, power, data) {
     this.updateSwitchState(state);
     this.updateOutletInUse(state);
     this.updateConsumption(power);
-    this.updateTotalConsumption(data.TodayConsumed);
+    this.updateTotalConsumption(data.TodayConsumed, data.TodayONTime); // TodayConsumed in mW minutes, TodayONTime in seconds
 }
 
 WemoAccessory.prototype.updateOutletInUse = function(state) {
@@ -830,13 +830,16 @@ WemoAccessory.prototype.updateSwitchState = function(state) {
     return value;
 }
 
-WemoAccessory.prototype.updateTotalConsumption = function(raw) {
-    var value = Math.round(raw / 10000 * 6) / 100;
+WemoAccessory.prototype.updateTotalConsumption = function(raw, raw2) { // raw=data.TodayConsumed, raw 2=data.TodayONTime
+    var value = Math.round(raw / (1000 * 60));  // convert to Wh, raw is total mW minutes
+    var kWh = value / 1000; // convert to kWh
+    var onHours = Math.round(raw2 / 36) / 100;  // convert to hours, raw2 in seconds
     var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
     var totalConsumption = service.getCharacteristic(TotalConsumption);
 
     if (totalConsumption.value !== value) {
-        this.log("%s - Total Consumption: %skwh", this.accessory.displayName, value);
+        this.log("%s - Total On Time: %s hours", this.accessory.displayName, onHours);  // new log entry
+        this.log("%s - Total Consumption: %skWh", this.accessory.displayName, kWh); // log correct kWh
         totalConsumption.updateValue(value);
     }
 
