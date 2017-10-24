@@ -618,6 +618,18 @@ WemoAccessory.prototype.setTargetDoorState = function(state, callback) {
             return;
         }
     }
+    else {
+        if (value == Characteristic.TargetDoorState.CLOSED && currentDoorState.value == Characteristic.CurrentDoorState.CLOSING) {
+            this.log("Door already closing");
+            callback(null);
+            return;
+        }
+        else if (value == Characteristic.TargetDoorState.OPEN && currentDoorState.value == Characteristic.CurrentDoorState.OPENING) {
+            this.log("Door already opening");
+            callback(null);
+            return;
+        }
+    }
 
     this.client.setBinaryState(1, function (err) {
         if(!err) {
