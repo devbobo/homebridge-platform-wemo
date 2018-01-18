@@ -375,10 +375,12 @@ WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) 
             service
                 .getCharacteristic(characteristic)
                 .on('set', this.setTargetDoorState.bind(this));
+            break;
       case Characteristic.Brightness:
             service
                 .getCharacteristic(characteristic)
-                .on('set', this.setBrightness.bind(this))
+                .on('set', this.setBrightness.bind(this));
+            break;
     }
 }
 
