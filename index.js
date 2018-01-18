@@ -189,7 +189,7 @@ WemoPlatform.prototype.addAccessory = function(device) {
             serviceType = Service.Switch;
             break;
         case Wemo.DEVICE_TYPE.Dimmer:
-            serviceType = Service.Switch;
+            serviceType = Service.Lightbulb;
             break;
         case Wemo.DEVICE_TYPE.Motion:
         case "urn:Belkin:device:NetCamSensor:1":
@@ -216,6 +216,9 @@ WemoPlatform.prototype.addAccessory = function(device) {
             //service.addCharacteristic(Characteristic.OutletInUse);
             service.addCharacteristic(Consumption);
             service.addCharacteristic(TotalConsumption);
+            break;
+        case Wemo.DEVICE_TYPE.Dimmer:
+            service.addCharacteristic(Characteristic.Brightness);
             break;
     }
 
@@ -372,11 +375,17 @@ WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) 
             service
                 .getCharacteristic(characteristic)
                 .on('set', this.setTargetDoorState.bind(this));
+      case Characteristic.Brightness:
+            service
+                .getCharacteristic(characteristic)
+                .on('set', this.setBrightness.bind(this))
     }
 }
 
 WemoAccessory.prototype.addEventHandlers = function() {
     this.addEventHandler(Service.Switch, Characteristic.On);
+    this.addEventHandler(Service.Lightbulb, Characteristic.On);
+    this.addEventHandler(Service.Lightbulb, Characteristic.Brightness);
     this.addEventHandler(Service.GarageDoorOpener, Characteristic.TargetDoorState);
 }
 
@@ -517,6 +526,10 @@ WemoAccessory.prototype.observeDevice = function(device) {
     if (device.deviceType === Wemo.DEVICE_TYPE.Insight) {
         this.client.on('insightParams', this.updateInsightParams.bind(this));
     }
+
+    if (device.deviceType === Wemo.DEVICE_TYPE.Dimmer) {
+        this.client.on('brightness', this.updateBrightness.bind(this));
+    }
 }
 
 WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTriggered) {
@@ -577,7 +590,7 @@ WemoAccessory.prototype.setDoorMoving = function(targetDoorState, homekitTrigger
 
 WemoAccessory.prototype.setSwitchState = function(state, callback) {
     var value = state | 0;
-    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet) || this.accessory.getService(Service.Lightbulb);
     var switchState = service.getCharacteristic(Characteristic.On);
     callback = callback || function() {};
 
@@ -596,6 +609,47 @@ WemoAccessory.prototype.setSwitchState = function(state, callback) {
     else {
         callback(null);
     }
+}
+
+WemoAccessory.prototype.setBrightness = function(value, callback) {
+  callback = callback || function() {};
+
+  if (this.brightness == value) {
+    callback(null);
+    return;
+  }
+
+  this._brightness = value;
+
+  //defer the actual update to smooth out changes from sliders
+  setTimeout(function(caller, value) {
+    //check that we actually have a change to make and that something
+    //hasn't tried to update the brightness again in the last 0.1 seconds
+    if (caller.brightness !== value && caller._brightness == value) {
+      caller.client.setBrightness(value, function(err) {
+        if (err) {
+          this.log("%s - Set brightness FAILED: %s. Error: %s", this.accessory.displayName, value, err.code);
+        } else {
+          caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
+          caller.brightness = value;
+        }
+      }.bind(caller));
+    }
+  }, 100, this, value);
+
+  callback(null);
+}
+
+WemoAccessory.prototype.updateBrightness = function(newBrightness) {
+  var currentBrightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
+
+  if (currentBrightness.value != newBrightness) {
+    this.log("%s - Updated brightness: %s%", this.accessory.displayName, newBrightness);
+    currentBrightness.updateValue(newBrightness);
+    this.brightness = newBrightness;
+  }
+
+  return newBrightness;
 }
 
 WemoAccessory.prototype.setTargetDoorState = function(state, callback) {
@@ -823,7 +877,7 @@ WemoAccessory.prototype.updateSwitchState = function(state) {
     state = state | 0;
 
     var value = !!state;
-    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet) || this.accessory.getService(Service.Lightbulb);
     var switchState = service.getCharacteristic(Characteristic.On);
 
     if (switchState.value !== value) {
