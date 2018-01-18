@@ -352,7 +352,7 @@ WemoAccessory.prototype.addEventHandler = function(serviceName, characteristic) 
 
     var service = this.accessory.getService(serviceName);
 
-    if (service === undefined) {
+    if (service === undefined && serviceName === Service.Switch) {
         serviceName = Service.Outlet;
         service = this.accessory.getService(serviceName);
     }
