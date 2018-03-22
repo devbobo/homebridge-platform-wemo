@@ -230,7 +230,13 @@ WemoPlatform.prototype.addLinkAccessory = function(link, device) {
     this.log("Found: %s [%s]", device.friendlyName, device.deviceId);
 
     var accessory = new Accessory(device.friendlyName, UUIDGen.generate(device.deviceId));
-    accessory.addService(Service.Lightbulb, device.friendlyName).addCharacteristic(Characteristic.Brightness);
+    var service = accessory.addService(Service.Lightbulb, device.friendlyName)
+
+    service.addCharacteristic(Characteristic.Brightness);
+
+    if (device.capabilities[WemoLinkAccessory.OPTIONS.Temperature] !== undefined) {
+        service.addCharacteristic(Characteristic.ColorTemperature);
+    }
 
     this.accessories[accessory.UUID] = new WemoLinkAccessory(this.log, accessory, link, device);
     this.api.registerPlatformAccessories("homebridge-platform-wemo", "BelkinWeMo", [accessory]);
@@ -985,27 +991,30 @@ function WemoLinkAccessory(log, accessory, link, device) {
 }
 
 WemoLinkAccessory.OPTIONS = {
-    Brightness: '10008',
-    Switch:     '10006'
+    Brightness:  '10008',
+    Color:       '10300',
+    Switch:      '10006',
+    Temperature: '30301',
 }
 
 WemoLinkAccessory.prototype.addEventHandler = function(characteristic) {
-    var service = this.accessory.getService(Service.Lightbulb)
+    var service = this.accessory.getService(Service.Lightbulb);
 
     if (service.testCharacteristic(characteristic) === false) {
         return;
     }
 
+    var object = service.getCharacteristic(characteristic);
+
     switch(characteristic) {
         case Characteristic.On:
-            service
-                .getCharacteristic(Characteristic.On)
-                .on('set', this.setSwitchState.bind(this));
+            object.on('set', this.setSwitchState.bind(this));
             break;
         case Characteristic.Brightness:
-            service
-                .getCharacteristic(Characteristic.Brightness)
-                .on('set', this.setBrightness.bind(this));
+            object.on('set', this.setBrightness.bind(this));
+            break;
+        case Characteristic.ColorTemperature:
+            object.on('set', this.setColorTemperature.bind(this));
             break;
     }
 }
@@ -1013,6 +1022,7 @@ WemoLinkAccessory.prototype.addEventHandler = function(characteristic) {
 WemoLinkAccessory.prototype.addEventHandlers = function () {
     this.addEventHandler(Characteristic.On);
     this.addEventHandler(Characteristic.Brightness);
+    this.addEventHandler(Characteristic.ColorTemperature);
 }
 
 WemoLinkAccessory.prototype.getSwitchState = function(callback) {
@@ -1034,8 +1044,13 @@ WemoLinkAccessory.prototype.getSwitchState = function(callback) {
 
         var value = this.updateSwitchState(capabilities[WemoLinkAccessory.OPTIONS.Switch]);
         this.updateBrightness(capabilities[WemoLinkAccessory.OPTIONS.Brightness]);
+        this.updateColorTemperature(capabilities[WemoLinkAccessory.OPTIONS.Temperature]);
         callback(null, value);
     }.bind(this));
+}
+
+WemoLinkAccessory.prototype.miredKelvin = function(value) {
+    return Math.round(100000/(5 * value)) * 50;
 }
 
 WemoLinkAccessory.prototype.setBrightness = function(value, callback) {
@@ -1053,9 +1068,43 @@ WemoLinkAccessory.prototype.setBrightness = function(value, callback) {
         //check that we actually have a change to make and that something
         //hasn't tried to update the brightness again in the last 0.1 seconds
         if (caller.brightness !== value && caller._brightness == value) {
-            caller.client.setDeviceStatus(caller.device.deviceId, 10008, value * 255 / 100, function(err, response) {
+            caller.client.setDeviceStatus(caller.device.deviceId, WemoLinkAccessory.OPTIONS.Brightness, value * 255 / 100, function(err, response) {
                 caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
                 caller.brightness = value;
+            }.bind(caller));
+        }
+    }, 100, this, value);
+
+    callback(null);
+}
+
+WemoLinkAccessory.prototype.setColorTemperature = function(value, callback) {
+    callback = callback || function() {};
+
+    var temperature = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.ColorTemperature);
+
+    if (this.temperature == value) {
+        callback(null);
+        return;
+    }
+
+    if (value < 154) {
+        value = 154;
+    }
+    else if (value > 370) {
+        value = 370;
+    }
+
+    this._temperature = value;
+
+    //defer the actual update to smooth out changes from sliders
+    setTimeout(function(caller, value) {
+        //check that we actually have a change to make and that something
+        //hasn't tried to update the temperature again in the last 0.1 seconds
+        if (caller.temperature !== value && caller._temperature == value) {
+            caller.client.setDeviceStatus(caller.device.deviceId, WemoLinkAccessory.OPTIONS.Temperature, value + ':0', function(err, response) {
+                caller.log("%s - Set color temperature: %s (%sK)", caller.accessory.displayName, value, caller.miredKelvin(value));
+                caller.temperature = value;
             }.bind(caller));
         }
     }, 100, this, value);
@@ -1094,6 +1143,9 @@ WemoLinkAccessory.prototype.statusChange = function(deviceId, capabilityId, valu
         case WemoLinkAccessory.OPTIONS.Switch:
             this.updateSwitchState(value);
             break;
+        case WemoLinkAccessory.OPTIONS.Temperature:
+            this.updateColorTemperature(value);
+            break;
         default:
             this.log("This capability (%s) not implemented", capabilityId);
     }
@@ -1107,6 +1159,24 @@ WemoLinkAccessory.prototype.updateBrightness = function(capability) {
         this.log("%s - Get brightness: %s%", this.accessory.displayName, value);
         brightness.updateValue(value);
         this.brightness = value;
+    }
+
+    return value;
+}
+
+WemoLinkAccessory.prototype.updateColorTemperature = function(capability) {
+    var service = this.accessory.getService(Service.Lightbulb);
+
+    if (service.testCharacteristic(Characteristic.ColorTemperature) === false || capability === undefined) {
+        return;
+    }
+
+    var value = Math.round(capability.split(':').shift());
+    var temperature = service.getCharacteristic(Characteristic.ColorTemperature);
+
+    if (temperature.value != value) {
+        this.log("%s - Get color temperature: %s (%sK)", this.accessory.displayName, value, this.miredKelvin(value));
+        temperature.updateValue(value);
     }
 
     return value;
