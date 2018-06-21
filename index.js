@@ -19,6 +19,9 @@
 const DEFAULT_DOOR_OPEN_TIME = 20,
       DEFAULT_NO_MOTION_TIME = 60;
 
+const RELAY_MODE_SWITCH    = 0,
+      RELAY_MODE_MOMENTARY = 1;
+
 var Wemo  = require('wemo-client'),
     debug = require('debug')('homebridge-platform-wemo');
 
@@ -285,19 +288,228 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                 callback(respDict, "platform", true, this.config);
             }
             break;
-        case "Menu":
-            context.onScreen = "Remove";
-        case "Remove":
+        case "DoModify":
+            context.accessory = context.sortedAccessories[request.response.selections[0]];
+            context.onScreenSelection = [];
+            context.canChangeService = [];
+
+            var items = [];
+
+            if (context.accessory.context.deviceType === Wemo.DEVICE_TYPE.Maker) {
+                items.push("Change Service");
+                context.onScreenSelection.push({action: 'change', item: 'service', screen: 'ChangeService'});
+            }
+
             respDict = {
                 "type": "Interface",
                 "interface": "list",
-                "title": "Select accessory to " + context.onScreen.toLowerCase(),
-                "allowMultipleSelection": context.onScreen == "Remove",
-                "items": sortAccessories()
+                "title": "Select action for " + context.accessory.displayName,
+                "allowMultipleSelection": false,
+                "items": items
             }
 
-            context.onScreen = "Do" + context.onScreen;
+            context.onScreen = "ModifyAccessory";
+
             callback(respDict);
+            break;;
+        case "ModifyAccessory":
+            if (!request.response.selections) {
+                context.onScreen = null;
+                callback(respDict, "platform", true, this.config);
+            }
+
+            var selection = context.onScreenSelection[request.response.selections[0]];
+
+            context.onScreen = selection.screen;
+
+            var items = [];
+
+            if (context.accessory.context.deviceType === Wemo.DEVICE_TYPE.Maker && context.accessory.context.switchMode == RELAY_MODE_MOMENTARY) {
+                var services = [Service.GarageDoorOpener, Service.Switch];
+
+                for (var index in services) {
+                    var service = services[index];
+
+                    if (service.UUID === context.accessory.context.serviceType) {
+                        continue;
+                    }
+
+                    context.canChangeService.push(service);
+
+                    switch(service.UUID) {
+                        case Service.GarageDoorOpener.UUID:
+                            items.push('GarageDoorOpener');
+                            break;
+                        case Service.Switch.UUID:
+                            items.push('Switch');
+                            break;
+                        default:
+                            items.push('unknown');
+                            break;
+                    }
+                }
+            }
+
+            respDict = {
+                "type": "Interface",
+                "interface": "list",
+                "title": "Select " + selection.item + " to " + selection.action,
+                "allowMultipleSelection": false,
+                "items": items
+            }
+
+            callback(respDict);
+            break;
+        case "ChangeService":
+            if (!request.response.selections) {
+                context.onScreen = null;
+                callback(respDict, "platform", true, this.config);
+            }
+
+            var item = context["can" + context.onScreen][request.response.selections[0]];
+
+            respDict = {
+                "type": "Interface",
+                "interface": "instruction",
+                "title": "Finished",
+                "detail": "Accessory service change failed."
+            }
+
+            try {
+                var accessory = self.accessories[context.accessory.UUID];
+                accessory.accessory.context.serviceType = item.UUID;
+                accessory.updateMakerMode();
+
+                respDict['detail'] = "Accessory service change was successful.";
+            }
+            catch(e) {
+
+            }
+
+            context.onScreen = null;
+            callback(respDict);
+            break;
+        case "Menu":
+            switch(request.response.selections[0]) {
+                case 0:
+                    context.onScreen = "Modify";
+                    break;
+                case 1:
+                    context.onScreen = "Remove";
+                    break;
+                case 2:
+                    context.onScreen = "Configuration";
+                    break;
+            }
+
+            if (context.onScreen != "Configuration") {
+                respDict = {
+                    "type": "Interface",
+                    "interface": "list",
+                    "title": "Select accessory to " + context.onScreen.toLowerCase(),
+                    "allowMultipleSelection": context.onScreen == "Remove",
+                    "items": sortAccessories()
+                }
+
+                context.onScreen = "Do" + context.onScreen;
+                callback(respDict);
+                break;
+            }
+
+            respDict = {
+                "type": "Interface",
+                "interface": "list",
+                "title": "Select Option",
+                "allowMultipleSelection": false,
+                "items": ["Ignored Devices"]
+            }
+
+            callback(respDict);
+            break;
+        case "Configuration":
+            respDict = {
+                "type": "Interface",
+                "interface": "list",
+                "title": "Modify Ignored Devices",
+                "allowMultipleSelection": false,
+                "items": this.ignoredDevices.length > 0 ? ["Add Accessory", "Remove Accessory"] : ["Add Accessory"]
+            }
+
+            context.onScreen = "IgnoreList";
+
+            callback(respDict);
+            break;
+        case "IgnoreList":
+            context.onScreen = request && request.response && request.response.selections[0] == 1 ? "IgnoreListRemove" : "IgnoreListAdd";
+
+            if (context.onScreen == "IgnoreListAdd") {
+                respDict = {
+                    "type": "Interface",
+                    "interface": "list",
+                    "title": "Select accessory to add to Ignored Devices",
+                    "allowMultipleSelection": true,
+                    "items": sortAccessories()
+                }
+            }
+            else {
+                context.selection = JSON.parse(JSON.stringify(this.ignoredDevices));
+
+                respDict = {
+                    "type": "Interface",
+                    "interface": "list",
+                    "title": "Select accessory to remove from Ignored Devices",
+                    "allowMultipleSelection": true,
+                    "items": context.selection
+                }
+            }
+
+            callback(respDict);
+            break;
+        case "IgnoreListAdd":
+            if (request.response.selections) {
+                for (var i in request.response.selections.sort()) {
+                    var accessory = context.sortedAccessories[request.response.selections[i]];
+
+                    if (accessory.context && accessory.context.id && this.ignoredDevices.indexOf(accessory.context.id) == -1) {
+                        this.ignoredDevices.push(accessory.context.id);
+                    }
+
+                    this.removeAccessory(accessory);
+                }
+
+                this.config.ignoredDevices = this.ignoredDevices;
+
+                respDict = {
+                    "type": "Interface",
+                    "interface": "instruction",
+                    "title": "Finished",
+                    "detail": "Ignore List update was successful."
+                }
+            }
+
+            context.onScreen = null;
+            callback(respDict, "platform", true, this.config);
+            break;
+
+        case "IgnoreListRemove":
+            if (request.response.selections) {
+                for (var i in request.response.selections) {
+                    var id = context.selection[request.response.selections[i]];
+
+                    if (this.ignoredDevices.indexOf(id) != -1) {
+                        this.ignoredDevices.splice(this.ignoredDevices.indexOf(id), 1);
+                    }
+                }
+            }
+
+            this.config.ignoredDevices = this.ignoredDevices;
+
+            if (this.config.ignoredDevices.length === 0) {
+                delete this.config.ignoredDevices;
+            }
+
+            context.onScreen = null;
+            callback(respDict, "platform", true, this.config);
             break;
         default:
             if (request && (request.response || request.type === "Terminate")) {
@@ -310,7 +522,7 @@ WemoPlatform.prototype.configurationRequestHandler = function(context, request, 
                     "interface": "list",
                     "title": "Select option",
                     "allowMultipleSelection": false,
-                    "items": ["Remove Accessory"]
+                    "items": ["Modify Accessory", "Remove Accessory", "Configuration"]
                 }
 
                 context.onScreen = "Menu";
@@ -335,6 +547,8 @@ function WemoAccessory(log, accessory, device) {
     this.accessory = accessory;
     this.device = device;
     this.log = log;
+
+    this.accessory.context.deviceType = device.deviceType;
 
     this.setupDevice(device);
 
@@ -408,33 +622,8 @@ WemoAccessory.prototype.getAttributes = function(callback) {
         }
 
         this.device.attributes = attributes;
-
-        // SwitchMode - Momentary
-        if (attributes.SwitchMode == 1) {
-            if (this.accessory.getService(Service.GarageDoorOpener) === undefined) {
-                this.accessory.addService(Service.GarageDoorOpener, this.accessory.displayName);
-                this.addEventHandler(Service.GarageDoorOpener, Characteristic.TargetDoorState);
-            }
-
-            if (this.accessory.getService(Service.Switch) !== undefined) {
-                this.accessory.removeService(this.accessory.getService(Service.Switch));
-            }
-
-            if (this.accessory.getService(Service.ContactSensor) !== undefined) {
-                this.accessory.removeService(this.accessory.getService(Service.ContactSensor));
-            }
-        }
-        // SwitchMode - Toggle
-        else if (attributes.SwitchMode == 0) {
-            if (this.accessory.getService(Service.Switch) === undefined) {
-                this.accessory.addService(Service.Switch, this.accessory.displayName);
-                this.addEventHandler(Service.Switch, Characteristic.On);
-            }
-
-            if (this.accessory.getService(Service.GarageDoorOpener) !== undefined) {
-                this.accessory.removeService(this.accessory.getService(Service.GarageDoorOpener));
-            }
-        }
+        this.accessory.context.switchMode = attributes.SwitchMode;
+        this.updateMakerMode();
 
         if (attributes.SensorPresent == 1) {
             if (this.accessory.getService(Service.Switch) !== undefined) {
@@ -620,44 +809,33 @@ WemoAccessory.prototype.setSwitchState = function(state, callback) {
 }
 
 WemoAccessory.prototype.setBrightness = function(value, callback) {
-  callback = callback || function() {};
+    callback = callback || function() {};
 
-  if (this.brightness == value) {
-    callback(null);
-    return;
-  }
-
-  this._brightness = value;
-
-  //defer the actual update to smooth out changes from sliders
-  setTimeout(function(caller, value) {
-    //check that we actually have a change to make and that something
-    //hasn't tried to update the brightness again in the last 0.1 seconds
-    if (caller.brightness !== value && caller._brightness == value) {
-      caller.client.setBrightness(value, function(err) {
-        if (err) {
-          this.log("%s - Set brightness FAILED: %s. Error: %s", this.accessory.displayName, value, err.code);
-        } else {
-          caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
-          caller.brightness = value;
-        }
-      }.bind(caller));
+    if (this.brightness == value) {
+        callback(null);
+        return;
     }
-  }, 100, this, value);
 
-  callback(null);
-}
+    this._brightness = value;
 
-WemoAccessory.prototype.updateBrightness = function(newBrightness) {
-  var currentBrightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
+    //defer the actual update to smooth out changes from sliders
+    setTimeout(function(caller, value) {
+        //check that we actually have a change to make and that something
+        //hasn't tried to update the brightness again in the last 0.1 seconds
+        if (caller.brightness !== value && caller._brightness == value) {
+            caller.client.setBrightness(value, function(err) {
+                if (err) {
+                    this.log("%s - Set brightness FAILED: %s. Error: %s", this.accessory.displayName, value, err.code);
+                }
+                else {
+                    caller.log("%s - Set brightness: %s%", caller.accessory.displayName, value);
+                    caller.brightness = value;
+                }
+            }.bind(caller));
+        }
+    }, 100, this, value);
 
-  if (currentBrightness.value != newBrightness) {
-    this.log("%s - Updated brightness: %s%", this.accessory.displayName, newBrightness);
-    currentBrightness.updateValue(newBrightness);
-    this.brightness = newBrightness;
-  }
-
-  return newBrightness;
+    callback(null);
 }
 
 WemoAccessory.prototype.setTargetDoorState = function(state, callback) {
@@ -720,6 +898,18 @@ WemoAccessory.prototype.setupDevice = function(device) {
     }.bind(this));
 }
 
+WemoAccessory.prototype.updateBrightness = function(newBrightness) {
+    var currentBrightness = this.accessory.getService(Service.Lightbulb).getCharacteristic(Characteristic.Brightness);
+
+    if (currentBrightness.value != newBrightness) {
+        this.log("%s - Updated brightness: %s%", this.accessory.displayName, newBrightness);
+        currentBrightness.updateValue(newBrightness);
+        this.brightness = newBrightness;
+    }
+
+    return newBrightness;
+}
+
 WemoAccessory.prototype.updateConsumption = function(raw) {
     var value = Math.round(raw / 1000);
     var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
@@ -733,26 +923,43 @@ WemoAccessory.prototype.updateConsumption = function(raw) {
     return value;
 }
 
+WemoAccessory.prototype.updateCurrentDoorState = function(value, actualFeedback) {
+    var state;
+
+    switch(value) {
+        case Characteristic.CurrentDoorState.OPEN:
+            state = "Open";
+            break;
+        case Characteristic.CurrentDoorState.CLOSED:
+            state = "Closed";
+            break;
+        case Characteristic.CurrentDoorState.OPENING:
+            state = "Opening";
+            break;
+        case Characteristic.CurrentDoorState.CLOSING:
+            state = "Closing";
+            break;
+        case Characteristic.CurrentDoorState.STOPPED:
+            state = "Stopped";
+            break;
+    }
+
+    this.log("%s - Get Current Door State: %s",
+        this.accessory.displayName,
+        state
+    );
+
+    this.accessory
+        .getService(Service.GarageDoorOpener)
+        .getCharacteristic(Characteristic.CurrentDoorState)
+        .updateValue(value);
+}
+
 WemoAccessory.prototype.updateInsightParams = function(state, power, data) {
     this.updateSwitchState(state);
     this.updateOutletInUse(state);
     this.updateConsumption(power);
     this.updateTotalConsumption(data.TodayConsumed, data.TodayONTime); // TodayConsumed in mW minutes, TodayONTime in seconds
-}
-
-WemoAccessory.prototype.updateOutletInUse = function(state) {
-    state = state | 0;
-
-    var value = !!state;
-    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
-    var outletInUse = service.getCharacteristic(Characteristic.OutletInUse);
-
-    if (outletInUse.value !== value) {
-        this.log("%s - Outlet In Use: %s", this.accessory.displayName, (value ? "Yes" : "No"));
-        outletInUse.setValue(value);
-    }
-
-    return value;
 }
 
 WemoAccessory.prototype.updateMotionDetected = function(state) {
@@ -786,36 +993,68 @@ WemoAccessory.prototype.updateMotionDetected = function(state) {
     }
 }
 
-WemoAccessory.prototype.updateCurrentDoorState = function(value, actualFeedback) {
-    var state;
+WemoAccessory.prototype.updateMakerMode = function() {
+    // SwitchMode - Momentary
+    if (this.accessory.context.switchMode == RELAY_MODE_MOMENTARY) {
+        if (this.accessory.context.serviceType === undefined ) {
+            this.accessory.context.serviceType = Service.GarageDoorOpener.UUID;
+        }
 
-    switch(value) {
-        case Characteristic.CurrentDoorState.OPEN:
-            state = "Open";
-            break;
-        case Characteristic.CurrentDoorState.CLOSED:
-            state = "Closed";
-            break;
-        case Characteristic.CurrentDoorState.OPENING:
-            state = "Opening";
-            break;
-        case Characteristic.CurrentDoorState.CLOSING:
-            state = "Closing";
-            break;
-        case Characteristic.CurrentDoorState.STOPPED:
-            state = "Stopped";
-            break;
+        switch (this.accessory.context.serviceType) {
+            case Service.GarageDoorOpener.UUID:
+                if (this.accessory.getService(Service.GarageDoorOpener) === undefined) {
+                    this.accessory.addService(Service.GarageDoorOpener, this.accessory.displayName);
+                    this.addEventHandler(Service.GarageDoorOpener, Characteristic.TargetDoorState);
+                }
+
+                if (this.accessory.getService(Service.Switch) !== undefined) {
+                    this.accessory.removeService(this.accessory.getService(Service.Switch));
+                }
+
+                if (this.accessory.getService(Service.ContactSensor) !== undefined) {
+                    this.accessory.removeService(this.accessory.getService(Service.ContactSensor));
+                }
+
+                break;
+            case Service.Switch.UUID:
+                if (this.accessory.getService(Service.Switch) === undefined) {
+                    this.accessory.addService(Service.Switch, this.accessory.displayName);
+                    this.addEventHandler(Service.Switch, Characteristic.On);
+                }
+
+                if (this.accessory.getService(Service.GarageDoorOpener) !== undefined) {
+                    this.accessory.removeService(this.accessory.getService(Service.GarageDoorOpener));
+                }
+
+                break;
+        }
+    }
+    // SwitchMode - Toggle
+    else if (this.accessory.context.switchMode == RELAY_MODE_SWITCH) {
+        if (this.accessory.getService(Service.Switch) === undefined) {
+            this.accessory.addService(Service.Switch, this.accessory.displayName);
+            this.addEventHandler(Service.Switch, Characteristic.On);
+        }
+
+        if (this.accessory.getService(Service.GarageDoorOpener) !== undefined) {
+            this.accessory.removeService(this.accessory.getService(Service.GarageDoorOpener));
+        }
+    }
+}
+
+WemoAccessory.prototype.updateOutletInUse = function(state) {
+    state = state | 0;
+
+    var value = !!state;
+    var service = this.accessory.getService(Service.Switch) || this.accessory.getService(Service.Outlet);
+    var outletInUse = service.getCharacteristic(Characteristic.OutletInUse);
+
+    if (outletInUse.value !== value) {
+        this.log("%s - Outlet In Use: %s", this.accessory.displayName, (value ? "Yes" : "No"));
+        outletInUse.setValue(value);
     }
 
-    this.log("%s - Get Current Door State: %s",
-        this.accessory.displayName,
-        state
-    );
-
-    this.accessory
-        .getService(Service.GarageDoorOpener)
-        .getCharacteristic(Characteristic.CurrentDoorState)
-        .updateValue(value);
+    return value;
 }
 
 WemoAccessory.prototype.updateSensorState = function(state, wasTriggered) {

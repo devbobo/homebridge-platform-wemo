@@ -2,8 +2,7 @@
 
 [![npm package](https://nodei.co/npm/homebridge-platform-wemo.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/homebridge-platform-wemo/)
 
-[![NPM Version](https://img.shields.io/npm/v/homebridge-platform-wemo.svg)](https://www.npmjs.com/package/homebridge-platform-wemo)
-[![Dependency Status](https://img.shields.io/versioneye/d/nodejs/homebridge-platform-wemo.svg)](https://www.versioneye.com/nodejs/homebridge-platform-wemo/)
+[![donate](https://img.shields.io/badge/%24-Buy%20me%20a%20coffee-ff69b4.svg)](https://www.buymeacoffee.com/devbobo)
 [![Slack Channel](https://img.shields.io/badge/slack-homebridge--wemo-E01563.svg)](https://homebridgeteam.slack.com/messages/C0HSKCAR4/)
 
 
