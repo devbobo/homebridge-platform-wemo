@@ -1376,7 +1376,6 @@ WemoLinkAccessory.prototype.setSwitchState = function(state, callback) {
 WemoLinkAccessory.prototype.setupDevice = function(link, device) {
     this.link = link;
     this.device = device;
-    this.client = wemo.client(device);
     this.client = wemo.client(link, this.log);
 
     this.client.on('error', function(err) {
